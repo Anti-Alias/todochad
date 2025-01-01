@@ -77,6 +77,12 @@ impl Graph {
         Ok(()) 
     }
 
+    pub fn clear_children(&mut self, task_id: TaskId) -> Result<()> {
+        let task = self.tasks.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
+        task.children.clear();
+        Ok(()) 
+    }
+
     fn contains_task(&self, task_id: TaskId) -> bool {
         self.tasks.iter().any(|(tid, _)| tid == task_id)
     }

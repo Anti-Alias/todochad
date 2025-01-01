@@ -22,32 +22,38 @@ struct Cli {
 enum Command { 
     #[command(name="add", about="Add a task")]
     Add { 
+        #[clap(help="Name of the task")]
         task_name: String,
     },
     #[command(name="rm", about="Remove a task")]
     Remove { 
         task_id: TaskId,
     }, 
-    #[command(name="ls", about="List tasks with table decorations")]
+    #[command(name="ls", about="List all tasks")]
     List {
-        #[clap(long, short, help="Strips away table decorations")]
+        #[clap(long, short, help="Strip away table decorations")]
         simple: bool,
     },
     #[command(name="clear", about="Clear all tasks")]
     Clear,
-    #[command(name="depadd", about="Adds child tasks as dependencies of another task")]
+    #[command(name="depadd", about="Add dependencies to a task")]
     DepAdd {
-        #[clap(help="Task that will receive child tasks")]
+        #[clap(help="Id of task receiving dependencies")]
         task_id: TaskId,
-        #[clap(required=true, help="Child task(s) to add")]
+        #[clap(required=true, help="Ids of tasks that will added as dependencies")]
         child_ids: Vec<TaskId>,
     },
-    #[command(name="deprm", about="Removes child tasks as dependencies from another task")]
+    #[command(name="deprm", about="Remove dependencies from a task")]
     DepRemove {
-        #[clap(help="Task that will remove child tasks")]
+        #[clap(help="Id of task removing dependencies")]
         task_id: TaskId,
-        #[clap(required=true, help="Child task(s) to remove")]
+        #[clap(required=true, help="Ids of tasks that will be removed as dependencies")]
         child_ids: Vec<TaskId>,
+    },
+    #[command(name="depclear", about="Clear dependencies of a task")]
+    DepClear {
+        #[clap(help="Id of task clearing dependencies")]
+        task_id: TaskId,
     },
 }
 
@@ -115,6 +121,11 @@ fn run_command(command: Command) -> Result<()> {
             for child_id in child_ids {
                 graph.remove_child(task_id, child_id)?;
             }
+            save_graph(&graph_path, &graph)?;
+        },
+        Command::DepClear { task_id } => {
+            let mut graph = load_graph(&graph_path)?;
+            graph.clear_children(task_id);
             save_graph(&graph_path, &graph)?;
         },
     }
