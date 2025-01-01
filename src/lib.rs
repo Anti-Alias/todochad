@@ -1,5 +1,6 @@
 use slab::Slab;
 use thiserror::*;
+use derive_more::Display;
 use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -46,6 +47,17 @@ impl Graph {
         self.tasks.get_mut(task_id)
     }
 
+    pub fn set_status(&mut self, task_id: TaskId, desired_status: TaskStatus) -> Result<()> {
+        let task = self.tasks.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
+        match (desired_status, task.status) {
+            (TaskStatus::Marked, TaskStatus::Finished)  => return Err(GraphError::CannotMarkFinishedTask),
+            (TaskStatus::Unmarked, TaskStatus::Finished) => return Err(GraphError::CannotUnmarkFinishedTask),
+            _ => {},
+        }
+        task.status = desired_status;
+        Ok(())
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (TaskId, &Task)> {
         self.tasks.iter()
     }
@@ -88,27 +100,26 @@ impl Graph {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum GraphError {
-    #[error("task not found")]
-    TaskNotFound,
-}
-
-pub type Result<T> = std::result::Result<T, GraphError>;
-
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Default, Debug)]
 pub struct Task { 
     pub name: String,
+    status: TaskStatus,
     #[serde(rename="children")]
     children: Vec<TaskId>,
 }
 
 impl Task {
+
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
+            status: TaskStatus::default(),
             children: vec![],
         }
+    }
+
+    pub fn status(&self) -> TaskStatus {
+        self.status
     }
 
     pub fn children(&self) -> &[TaskId] {
@@ -116,7 +127,27 @@ impl Task {
     }
 }
 
+#[derive(Serialize, Deserialize, Display, Copy, Clone, Eq, PartialEq, Default, Debug)]
+pub enum TaskStatus {
+    #[default]
+    Unmarked,
+    Marked,
+    Finished,
+}
+
 pub type TaskId = usize;
+
+#[derive(Error, Debug)]
+pub enum GraphError {
+    #[error("Task not found")]
+    TaskNotFound,
+    #[error("Cannot mark finished task")]
+    CannotMarkFinishedTask,
+    #[error("Cannot unmark finished task")]
+    CannotUnmarkFinishedTask,
+}
+
+pub type Result<T> = std::result::Result<T, GraphError>;
 
 
 #[cfg(test)]

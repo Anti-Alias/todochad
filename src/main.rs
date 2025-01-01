@@ -4,7 +4,7 @@ use std::path::{PathBuf, Path};
 use clap::{command, Parser, Subcommand};
 use thiserror::Error;
 use tabled::{Table, Tabled};
-use tod::{Graph, GraphError, Task, TaskId};
+use tod::{Graph, GraphError, Task, TaskId, TaskStatus};
 
 const APP_NAME: &str        = "tod";
 const GRAPH_FILE_NAME: &str = "graph.ron";
@@ -27,12 +27,28 @@ enum Command {
     },
     #[command(name="rm", about="Remove a task")]
     Remove { 
+        #[clap(help="Id of the task")]
         task_id: TaskId,
     }, 
     #[command(name="ls", about="List all tasks")]
     List {
         #[clap(long, short, help="Strip away table decorations")]
         simple: bool,
+    },
+    #[command(name="mark", about="Marks a task, adding it to the todo list")]
+    Mark { 
+        #[clap(help="Id of the task")]
+        task_id: TaskId,
+    },
+    #[command(name="unmark", about="Marks a task, removing it from the todo list")]
+    Unmark { 
+        #[clap(help="Id of the task")]
+        task_id: TaskId,
+    },
+    #[command(name="finish", about="Finishes a task")]
+    Finish { 
+        #[clap(help="Id of the task")]
+        task_id: TaskId,
     },
     #[command(name="clear", about="Clear all tasks")]
     Clear,
@@ -86,6 +102,21 @@ fn run_command(command: Command) -> Result<()> {
             graph.remove(task_id).ok_or(GraphError::TaskNotFound)?;
             save_graph(&graph_path, &graph)?;
         },
+        Command::Mark { task_id } => {
+            let mut graph = load_graph(&graph_path)?;
+            graph.set_status(task_id, TaskStatus::Marked)?;
+            save_graph(&graph_path, &graph)?;
+        },
+        Command::Unmark { task_id } => {
+            let mut graph = load_graph(&graph_path)?;
+            graph.set_status(task_id, TaskStatus::Unmarked)?;
+            save_graph(&graph_path, &graph)?;
+        },
+        Command::Finish { task_id } => {
+            let mut graph = load_graph(&graph_path)?;
+            graph.set_status(task_id, TaskStatus::Finished)?;
+            save_graph(&graph_path, &graph)?;
+        },
         Command::List { simple } => {
             let graph = load_graph(&graph_path)?;
             if !simple {
@@ -125,7 +156,7 @@ fn run_command(command: Command) -> Result<()> {
         },
         Command::DepClear { task_id } => {
             let mut graph = load_graph(&graph_path)?;
-            graph.clear_children(task_id);
+            graph.clear_children(task_id)?;
             save_graph(&graph_path, &graph)?;
         },
     }
@@ -170,6 +201,7 @@ fn graph_path() -> Result<PathBuf> {
 struct TaskRow<'a> {
     id: TaskId,
     name: &'a str,
+    status: TaskStatus,
     dependencies: Dependencies<'a>, 
 }
 
@@ -178,6 +210,7 @@ impl<'a> TaskRow<'a> {
         Self {
             id,
             name: &task.name,
+            status: task.status(),
             dependencies: Dependencies(task.children()),
         }
     }
