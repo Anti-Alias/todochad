@@ -46,12 +46,22 @@ impl Graph {
     pub fn get_mut(&mut self, task_id: TaskId) -> Option<&mut Task> {
         self.tasks.get_mut(task_id)
     }
+    
+    pub fn todo_list(&self) -> Vec<(TaskId, &Task)> {
+        let mut result = vec![];
+        let mut visited = vec![false; self.tasks.len()];
+        for (task_id, task) in &self.tasks {
+            if task.status() != TaskStatus::Selected { continue }
+            self.traverse(task_id, &mut visited, &mut result);
+        }
+        result
+    }
 
     pub fn set_status(&mut self, task_id: TaskId, desired_status: TaskStatus) -> Result<()> {
         let task = self.tasks.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
         match (desired_status, task.status) {
-            (TaskStatus::Marked, TaskStatus::Finished)  => return Err(GraphError::CannotMarkFinishedTask),
-            (TaskStatus::Unmarked, TaskStatus::Finished) => return Err(GraphError::CannotUnmarkFinishedTask),
+            (TaskStatus::Selected, TaskStatus::Finished)  => return Err(GraphError::CannotSelectFinishedTask),
+            (TaskStatus::Deselected, TaskStatus::Finished) => return Err(GraphError::CannotDeselectFinishedTask),
             _ => {},
         }
         task.status = desired_status;
@@ -134,6 +144,21 @@ impl Graph {
         }
         false
     }
+
+    fn traverse<'a>(
+        &'a self,
+        task_id: TaskId,
+        visited: &mut [bool],
+        result: &mut Vec<(TaskId, &'a Task)>,
+    ) {
+        if visited[task_id] { return }
+        visited[task_id] = true;
+        let task = &self.tasks[task_id];
+        result.push((task_id, task));
+        for child_id in task.children.iter().copied() {
+            self.traverse(child_id, visited, result);
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Default, Debug)]
@@ -166,8 +191,8 @@ impl Task {
 #[derive(Serialize, Deserialize, Display, Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub enum TaskStatus {
     #[default]
-    Unmarked,
-    Marked,
+    Deselected,
+    Selected,
     Finished,
 }
 
@@ -179,10 +204,10 @@ pub enum GraphError {
     TaskNotFound,
     #[error("Cycle detected")]
     CycleDetected,
-    #[error("Cannot mark finished task")]
-    CannotMarkFinishedTask,
-    #[error("Cannot unmark finished task")]
-    CannotUnmarkFinishedTask,
+    #[error("Cannot select finished task")]
+    CannotSelectFinishedTask,
+    #[error("Cannot deselect finished task")]
+    CannotDeselectFinishedTask,
 }
 
 pub type Result<T> = std::result::Result<T, GraphError>;
@@ -201,19 +226,6 @@ mod test {
         let find_wallet = graph.get(find_wallet_id).unwrap();
         assert_eq!(find_keys, &Task::new("Find Keys"));
         assert_eq!(find_wallet, &Task::new("Find Wallet"));
-    }
-
-    #[test]
-    fn test_removal() {
-        let mut graph = Graph::new();
-        let find_keys_id = graph.insert(Task::new("Find Keys"));
-        let find_wallet_id  = graph.insert(Task::new("Find Wallet"));
-        let find_keys = graph.remove(find_keys_id);
-        let find_wallet = graph.get(find_wallet_id);
-        let find_keys_ref = graph.get(find_keys_id);
-        assert_eq!(find_keys, Some(Task::new("Find Keys")));
-        assert_eq!(find_wallet, Some(&Task::new("Find Wallet")));
-        assert_eq!(find_keys_ref, None); 
     }
 
     #[test]

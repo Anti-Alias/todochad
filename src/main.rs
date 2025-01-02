@@ -35,13 +35,13 @@ enum Command {
         #[clap(long, short, help="Strip away table decorations")]
         simple: bool,
     },
-    #[command(name="mark", about="Marks a task, adding it to the todo list")]
-    Mark { 
+    #[command(name="sel", about="Selects a task, adding it to the todo list")]
+    Select { 
         #[clap(help="Id of the task")]
         task_id: TaskId,
     },
-    #[command(name="unmark", about="Marks a task, removing it from the todo list")]
-    Unmark { 
+    #[command(name="desel", about="Deselects a task, removing it from the todo list")]
+    Deselect { 
         #[clap(help="Id of the task")]
         task_id: TaskId,
     },
@@ -49,6 +49,11 @@ enum Command {
     Finish { 
         #[clap(help="Id of the task")]
         task_id: TaskId,
+    },
+    #[command(name="todo", about="Produces a todo list of tasks using currently selected tasks")]
+    Todo {
+        #[clap(long, short, help="Strip away table decorations")]
+        simple: bool,
     },
     #[command(name="clear", about="Clear all tasks")]
     Clear,
@@ -87,7 +92,6 @@ fn run() -> Result<()> {
 }
 
 /// Runs a command on a graph.
-/// Returns true if the graph was edited.
 fn run_command(command: Command) -> Result<()> {
     let graph_path = graph_path()?;
     match command {
@@ -102,14 +106,14 @@ fn run_command(command: Command) -> Result<()> {
             graph.remove(task_id).ok_or(GraphError::TaskNotFound)?;
             save_graph(&graph_path, &graph)?;
         },
-        Command::Mark { task_id } => {
+        Command::Select { task_id } => {
             let mut graph = load_graph(&graph_path)?;
-            graph.set_status(task_id, TaskStatus::Marked)?;
+            graph.set_status(task_id, TaskStatus::Selected)?;
             save_graph(&graph_path, &graph)?;
         },
-        Command::Unmark { task_id } => {
+        Command::Deselect { task_id } => {
             let mut graph = load_graph(&graph_path)?;
-            graph.set_status(task_id, TaskStatus::Unmarked)?;
+            graph.set_status(task_id, TaskStatus::Deselected)?;
             save_graph(&graph_path, &graph)?;
         },
         Command::Finish { task_id } => {
@@ -117,19 +121,22 @@ fn run_command(command: Command) -> Result<()> {
             graph.set_status(task_id, TaskStatus::Finished)?;
             save_graph(&graph_path, &graph)?;
         },
+        Command::Todo { simple } => {
+            let graph = load_graph(&graph_path)?;
+            let todo_list = graph.todo_list();
+            let mut task_rows: Vec<TaskRow> = todo_list.iter()
+                .map(|(task_id, task)| TaskRow::new(*task_id, task))
+                .collect();
+            task_rows.sort_by_key(|task_row| task_row.dependencies.0.len());
+            print_task_rows(&task_rows, simple);
+        },
         Command::List { simple } => {
             let graph = load_graph(&graph_path)?;
-            if !simple {
-                let task_rows = graph.iter().map(|(task_id, task)| TaskRow::new(task_id, task));
-                let task_table = Table::new(task_rows);
-                println!("{task_table}");
-            }
-            else {
-                for (task_id, task) in graph.iter() {
-                    let task_row = TaskRow::new(task_id, task);
-                    task_row.print();
-                }
-            }
+            let mut task_rows: Vec<TaskRow> = graph.iter()
+                .map(|(task_id, task)| TaskRow::new(task_id, task))
+                .collect();
+            task_rows.sort_by_key(|task_row| !task_row.selected);
+            print_task_rows(&task_rows, simple);
         },
         Command::Clear => {
             match fs::exists(&graph_path) { 
@@ -161,6 +168,18 @@ fn run_command(command: Command) -> Result<()> {
         },
     }
     Ok(())
+}
+
+fn print_task_rows(task_rows: &[TaskRow], simple: bool) {
+    if !simple {
+        let task_table = Table::new(task_rows);
+        println!("{task_table}");
+    }
+    else {
+        for task_row in task_rows {
+            task_row.print();
+        }
+    }
 }
 
 fn load_graph(graph_path: &Path) -> Result<Graph> {
@@ -201,20 +220,22 @@ fn graph_path() -> Result<PathBuf> {
 struct TaskRow<'a> {
     id: TaskId,
     name: &'a str,
-    status: TaskStatus,
+    selected: bool,
+    finished: bool,
     dependencies: Dependencies<'a>, 
 }
 
 impl<'a> TaskRow<'a> {
     fn new(id: TaskId, task: &'a Task) -> Self {
-        Self {
-            id,
-            name: &task.name,
-            status: task.status(),
-            dependencies: Dependencies(task.children()),
-        }
+        let name = &task.name;
+        let dependencies = Dependencies(task.children());
+        let (selected, finished) = match task.status() {
+            TaskStatus::Selected => (true, false),
+            TaskStatus::Deselected => (false, false),
+            TaskStatus::Finished => (false, true),
+        };
+        Self { id, name, selected, finished, dependencies }
     }
-
     fn print(&self) {
         println!("{} \"{}\" {}", self.id, self.name, self.dependencies);
     }
