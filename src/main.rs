@@ -4,13 +4,13 @@ use std::path::{PathBuf, Path};
 use clap::{command, Parser, Subcommand};
 use thiserror::Error;
 use tabled::{Table, Tabled};
-use tod::{Graph, GraphError, Task, TaskId, TaskStatus};
+use tdc::{Graph, GraphError, Task, TaskId, TaskStatus};
 
-const APP_NAME: &str        = "tod";
+const APP_NAME: &str        = "tdc";
 const GRAPH_FILE_NAME: &str = "graph.ron";
 
 #[derive(Parser, Debug)]
-#[command(name="tod")]
+#[command(name="tdc")]
 #[command(version="0.1")]
 #[command(about="A todo list generator using a dependency graph")]
 struct Cli {
