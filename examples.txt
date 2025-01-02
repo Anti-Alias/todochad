@@ -1,4 +1,0 @@
-# Adding tasks
-tod add "Get supplies"          # Adds task, returns id number.
-tod add -p 0 -p 1 "Buy eggs"    # Adds task with parent tasks. 
-tod add -c 2 -p 3 "Buy eggs"    # Adds task with child tasks. 
