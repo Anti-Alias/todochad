@@ -47,7 +47,7 @@ impl Graph {
         self.tasks.get_mut(task_id)
     }
     
-    pub fn todo_list(&self) -> Vec<(TaskId, &Task)> {
+    pub fn traverse_selected(&self) -> Vec<(TaskId, &Task)> {
         let mut result = vec![];
         let mut visited = vec![false; self.tasks.len()];
         for (task_id, task) in &self.tasks {
@@ -62,10 +62,31 @@ impl Graph {
         match (desired_status, task.status) {
             (TaskStatus::Selected, TaskStatus::Finished)  => return Err(GraphError::CannotSelectFinishedTask),
             (TaskStatus::Deselected, TaskStatus::Finished) => return Err(GraphError::CannotDeselectFinishedTask),
-            _ => {},
+            (TaskStatus::Finished, TaskStatus::Finished) => return Err(GraphError::CannotFinishFinishedTask),
+            (TaskStatus::Finished, _) => {
+                if !self.has_met_dependencies(task_id).unwrap() {
+                    return Err(GraphError::TaskDependenciesUnmet);
+                }
+            } 
+            _ => {}
         }
+        let task = self.tasks.get_mut(task_id).unwrap();
         task.status = desired_status;
         Ok(())
+    }
+
+    pub fn select_all(&mut self) {
+        for (_task_id, task) in &mut self.tasks {
+            if task.status == TaskStatus::Finished { continue }
+            task.status = TaskStatus::Selected;
+        }
+    }
+
+    pub fn deselect_all(&mut self) {
+        for (_task_id, task) in &mut self.tasks {
+            if task.status == TaskStatus::Finished { continue }
+            task.status = TaskStatus::Deselected;
+        }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (TaskId, &Task)> {
@@ -82,6 +103,18 @@ impl Graph {
 
     pub fn is_empty(&self) -> bool {
         self.tasks.is_empty()
+    }
+
+    pub fn has_met_dependencies(&self, task_id: TaskId) -> Result<bool> {
+        let task = self.tasks.get(task_id).ok_or(GraphError::TaskNotFound)?;
+        if task.status == TaskStatus::Finished { return Ok(false) }
+        for child_id in task.children.iter().copied() {
+            let child = &self.tasks[child_id];
+            if child.status != TaskStatus::Finished {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     pub fn insert_child(&mut self, task_id: TaskId, child_id: TaskId) -> Result<()> {
@@ -202,12 +235,16 @@ pub type TaskId = usize;
 pub enum GraphError {
     #[error("Task not found")]
     TaskNotFound,
+    #[error("Task has unmet dependencies")]
+    TaskDependenciesUnmet,
     #[error("Cycle detected")]
     CycleDetected,
     #[error("Cannot select finished task")]
     CannotSelectFinishedTask,
     #[error("Cannot deselect finished task")]
     CannotDeselectFinishedTask,
+    #[error("Cannot finish an already finished task")]
+    CannotFinishFinishedTask,
 }
 
 pub type Result<T> = std::result::Result<T, GraphError>;
