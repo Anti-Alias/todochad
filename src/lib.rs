@@ -76,6 +76,9 @@ impl Graph {
 
     pub fn insert_child(&mut self, task_id: TaskId, child_id: TaskId) -> Result<()> {
         if !self.contains_task(child_id) { return Err(GraphError::TaskNotFound) }
+        if self.is_reachable(child_id, task_id)? {
+            return Err(GraphError::CycleDetected);
+        }
         let task = self.tasks.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
         if !task.children.iter().any(|id| *id == child_id) {
             task.children.push(child_id);
@@ -96,7 +99,40 @@ impl Graph {
     }
 
     fn contains_task(&self, task_id: TaskId) -> bool {
-        self.tasks.iter().any(|(tid, _)| tid == task_id)
+        self.tasks.get(task_id).is_some()
+    }
+
+    /// Traverses the graph, starting at a given task.
+    /// Returns collection of tasks 
+    pub fn is_reachable(&self, task_id_a: TaskId, task_id_b: TaskId) -> Result<bool> {
+        // Early checks
+        let task_a = self.tasks.get(task_id_a).ok_or(GraphError::TaskNotFound)?;
+        if task_id_a == task_id_b { return Ok(true) }
+        if !self.contains_task(task_id_b) { return Err(GraphError::TaskNotFound) }
+        // Main algorithm
+        let mut visited = vec![false; self.tasks.len()];
+        visited[task_id_a] = true;
+        for child_id in task_a.children.iter().copied() {
+            if self._is_reachable(child_id, task_id_b, &mut visited) {
+                return Ok(true)
+            }
+        }
+        Ok(false)
+    }
+
+    /// Traverses the graph, starting at a given task.
+    /// Returns collection of tasks 
+    pub fn _is_reachable(&self, task_id_a: TaskId, task_id_b: TaskId, visited: &mut [bool]) -> bool {
+        if task_id_a == task_id_b { return true }
+        let task_a = &self.tasks[task_id_a];
+        visited[task_id_a] = true;
+        for child_id in task_a.children.iter().copied() {
+            if visited[child_id] { continue }
+            if self._is_reachable(child_id, task_id_b, visited) {
+                return true
+            }
+        }
+        false
     }
 }
 
@@ -141,6 +177,8 @@ pub type TaskId = usize;
 pub enum GraphError {
     #[error("Task not found")]
     TaskNotFound,
+    #[error("Cycle detected")]
+    CycleDetected,
     #[error("Cannot mark finished task")]
     CannotMarkFinishedTask,
     #[error("Cannot unmark finished task")]
