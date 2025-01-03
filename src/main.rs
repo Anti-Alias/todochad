@@ -5,7 +5,7 @@ use clap::{command, Parser, Subcommand};
 use ron::ser::PrettyConfig;
 use thiserror::Error;
 use tabled::{Table, Tabled};
-use tdc::{Graph, GraphError, Task, TaskId };
+use tdc::{Graph, GraphError, Task, TaskId, TaskOrder };
 
 const APP_NAME: &str        = "tdc";
 const GRAPH_FILE_NAME: &str = "graph.ron";
@@ -73,6 +73,12 @@ enum Command {
         #[clap(help="Id of task clearing dependencies")]
         task_id: TaskId,
     },
+    #[command(name="order", about="Set the order of a task using an integer. If not set, order is cleared.")]
+    Order {
+        #[clap(help="Id of task being ordered")]
+        task_id: TaskId,
+        order: Option<i32>,
+    },
 }
 
 fn main() {
@@ -135,7 +141,7 @@ fn run_command(command: Command) -> Result<()> {
                 .map(|(task_id, task)| TaskRow::new(task_id, task))
                 .filter(|task| all || task.doable())
                 .collect();
-            task_rows.sort_by_key(|task_row| !task_row.doable());
+            task_rows.sort_by_key(|task_row| (!task_row.doable(), task_row.order));
             print_task_rows(&task_rows);
         },
         Command::List => {
@@ -172,6 +178,16 @@ fn run_command(command: Command) -> Result<()> {
         Command::DepClear { task_id } => {
             let mut graph = load_graph(&graph_path)?;
             graph.clear_children(task_id)?;
+            save_graph(&graph_path, &graph)?;
+        },
+        Command::Order { task_id, order } => {
+            let mut graph = load_graph(&graph_path)?;
+            let task = graph.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
+            let order = match order { 
+                Some(order) => TaskOrder::Order(order),
+                None => TaskOrder::Last,
+            };
+            task.order = order;
             save_graph(&graph_path, &graph)?;
         },
     }
@@ -223,6 +239,7 @@ struct TaskRow<'a> {
     id: TaskId,
     name: &'a str,
     selected: bool,
+    order: TaskOrder,
     dependencies: Dependencies<'a>, 
 }
 
@@ -232,6 +249,7 @@ impl<'a> TaskRow<'a> {
             id, 
             name: &task.name, 
             selected: false,
+            order: task.order, 
             dependencies: Dependencies(task.children()),
         }
     }

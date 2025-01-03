@@ -1,6 +1,7 @@
 use slab::Slab;
 use thiserror::*;
 use serde::{Serialize, Deserialize};
+use std::fmt;
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Graph {
@@ -165,6 +166,7 @@ impl Graph {
 pub struct Task { 
     pub name: String,
     pub selected: bool,
+    pub order: TaskOrder, 
     #[serde(rename="children")]
     children: Vec<TaskId>,
 }
@@ -175,12 +177,29 @@ impl Task {
         Self {
             name: name.into(),
             selected: false,
+            order: TaskOrder::default(),
             children: vec![],
         }
     }
 
     pub fn children(&self) -> &[TaskId] {
         &self.children
+    }
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
+pub enum TaskOrder {
+    Order(i32),
+    #[default]
+    Last,
+}
+
+impl fmt::Display for TaskOrder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let TaskOrder::Order(order) = self {
+            write!(f, "{order}")?;
+        }
+        Ok(())
     }
 }
 
