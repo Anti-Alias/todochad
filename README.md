@@ -1,7 +1,9 @@
 # TodoChad
 TodoChad is a todo-list generator.
-You create tasks, create task dependencies, and mark tasks you want to prioritize. 
-TodoChad will only show you the doable tasks at any given time, making task management more manageable. 
+Use it to create tasks, task dependencies, and select tasks you want to prioritize. 
+TodoChad will take the task "graph" you create and use it to generate a flat todo list
+with only the tasks that are doable at the moment.
+At you finish tasks on your todo list, tasks previously hidden due to having unmet dependencies become visible.
 
 Adding tasks.
 ```bash
@@ -35,12 +37,13 @@ foo@bar:~$ tdc ls
 +----+---------------+----------+----------+--------+--------------+
 ```
 
-Selecting ""Get groceries"" task, putting it, and its dependencies on the todo list.
+Selecting the "Get groceries" task, putting it, and its dependencies on the todo list.
+Multiple tasks can be selected at once, if you want to prioritize more than one thing.
 ```bash
-foo@bar:~$ tdc sel 0
-```
+foo@bar:~$ tdc sel 0 ```
 
-Shows todo list, filtering out tasks that aren't doable.
+Shows todo list, filtering out tasks that aren't "doable" due to unmet dependencies.
+"Get groceries" will not be shown until "Get eggs" and "Get milk" are finished.
 ```bash
 foo@bar:~$ tdc todo 
 +----+----------+----------+----------+--------+--------------+
@@ -52,7 +55,8 @@ foo@bar:~$ tdc todo
 +----+----------+----------+----------+--------+--------------+
 ```
 
-Shows entire todo list 
+Show entire todo list, even tasks with unmet dependencies.
+Tasks that are doable will be shown first.
 ```bash
 foo@bar:~$ tdc todo -a
 +----+---------------+----------+----------+--------+--------------+
@@ -64,4 +68,27 @@ foo@bar:~$ tdc todo -a
 +----+---------------+----------+----------+--------+--------------+
 | 0  | Get groceries | true     | false    | false  | 1,2          |
 +----+---------------+----------+----------+--------+--------------+
+```
 
+Finishing tasks, one by one.
+```bash
+foo@bar:~$ tdc finish 1 
+foo@bar:~$ tdc todo 
++----+----------+----------+----------+--------+--------------+
+| id | name     | selected | finished | doable | dependencies |
++----+----------+----------+----------+--------+--------------+
+| 2  | Get milk | false    | false    | true   |              |
++----+----------+----------+----------+--------+--------------+
+foo@bar:~$ tdc finish 2 
+foo@bar:~$ tdc todo 
++----+---------------+----------+----------+--------+--------------+
+| id | name          | selected | finished | doable | dependencies |
++----+---------------+----------+----------+--------+--------------+
+| 0  | Get groceries | true     | false    | true   | 1,2          |
++----+---------------+----------+----------+--------+--------------+
+foo@bar:~$ tdc finish 0 
+foo@bar:~$ tdc todo 
++----+---------------+----------+----------+--------+--------------+
+| id | name          | selected | finished | doable | dependencies |
++----+---------------+----------+----------+--------+--------------+
+```
