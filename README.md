@@ -3,7 +3,7 @@ TodoChad is a todo-list generator.
 Use it to create tasks, task dependencies, and select tasks you want to prioritize. 
 TodoChad will take the task "graph" you create and use it to generate a flat todo list
 with only the tasks that are doable at the moment.
-At you finish tasks on your todo list, tasks previously hidden due to having unmet dependencies become visible.
+As you finish tasks on your todo list, tasks previously hidden due to having unmet dependencies become visible.
 
 Database file is stored in `~/.local/share/tdc/graph.ron`
 
