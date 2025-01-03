@@ -5,7 +5,7 @@ use clap::{command, Parser, Subcommand};
 use ron::ser::PrettyConfig;
 use thiserror::Error;
 use tabled::{Table, Tabled};
-use tdc::{Graph, GraphError, Task, TaskId, TaskStatus};
+use tdc::{Graph, GraphError, Task, TaskId };
 
 const APP_NAME: &str        = "tdc";
 const GRAPH_FILE_NAME: &str = "graph.ron";
@@ -46,11 +46,6 @@ enum Command {
         task_ids: Vec<TaskId>,
         #[clap(short, long, help="Deselects all tasks if set")]
         all: bool,
-    },
-    #[command(name="finish", about="Finishes a task")]
-    Finish { 
-        #[clap(help="Id of the task")]
-        task_id: TaskId,
     },
     #[command(name="todo", about="Produces a todo list of tasks using currently selected tasks")]
     Todo {
@@ -111,11 +106,11 @@ fn run_command(command: Command) -> Result<()> {
         Command::Select { task_ids, all } => {
             let mut graph = load_graph(&graph_path)?;
             if all {
-                graph.select_all();
+                graph.set_selected_all(true);
             }
             else {
                 for task_id in task_ids {
-                    graph.set_status(task_id, TaskStatus::Selected)?;
+                    graph.set_selected(task_id, true)?;
                 }
             }
             save_graph(&graph_path, &graph)?;
@@ -123,34 +118,31 @@ fn run_command(command: Command) -> Result<()> {
         Command::Deselect { task_ids, all } => {
             let mut graph = load_graph(&graph_path)?;
             if all {
-                graph.deselect_all();
+                graph.set_selected_all(false);
             }
             else {
                 for task_id in task_ids {
-                    graph.set_status(task_id, TaskStatus::Deselected)?;
+                    graph.set_selected(task_id, false)?;
                 }
             }
-            save_graph(&graph_path, &graph)?;
-        },
-        Command::Finish { task_id } => {
-            let mut graph = load_graph(&graph_path)?;
-            graph.set_status(task_id, TaskStatus::Finished)?;
             save_graph(&graph_path, &graph)?;
         },
         Command::Todo { all } => {
             let graph = load_graph(&graph_path)?;
             let tasks = graph.traverse_selected();
-            let task_rows = map_tasks_to_rows(tasks, &graph);
-            let mut task_rows: Vec<TaskRow> =  task_rows
-                .filter(|task| all || task.doable)
+            let mut task_rows: Vec<TaskRow> = tasks
+                .into_iter()
+                .map(|(task_id, task)| TaskRow::new(task_id, task))
+                .filter(|task| all || task.doable())
                 .collect();
-            task_rows.sort_by_key(|task_row| !task_row.doable);
+            task_rows.sort_by_key(|task_row| !task_row.doable());
             print_task_rows(&task_rows);
         },
         Command::List => {
             let graph = load_graph(&graph_path)?;
-            let task_rows = map_tasks_to_rows(graph.iter(), &graph);
-            let mut task_rows: Vec<TaskRow> = task_rows.collect();
+            let mut task_rows: Vec<TaskRow> = graph.iter() 
+                .map(|(task_id, task)| TaskRow::new(task_id, task))
+                .collect();
             task_rows.sort_by_key(|task_row| !task_row.selected);
             print_task_rows(&task_rows);
         },
@@ -231,34 +223,21 @@ struct TaskRow<'a> {
     id: TaskId,
     name: &'a str,
     selected: bool,
-    finished: bool,
-    doable: bool,
     dependencies: Dependencies<'a>, 
 }
 
 impl<'a> TaskRow<'a> {
-    fn new(id: TaskId, task: &'a Task, doable: bool) -> Self {
-        let name = &task.name;
-        let dependencies = Dependencies(task.children());
-        let (selected, finished) = match task.status() {
-            TaskStatus::Selected => (true, false),
-            TaskStatus::Deselected => (false, false),
-            TaskStatus::Finished => (false, true),
-        };
-        Self { id, name, selected, finished, doable, dependencies }
+    fn new(id: TaskId, task: &'a Task) -> Self {
+        Self {
+            id, 
+            name: &task.name, 
+            selected: false,
+            dependencies: Dependencies(task.children()),
+        }
     }
-}
-
-fn map_tasks_to_rows<'g, T>(tasks: T, graph: &'g Graph) -> impl Iterator<Item=TaskRow<'g>> 
-where 
-    T: IntoIterator<Item=(TaskId, &'g Task)>,
-{
-    tasks
-        .into_iter()
-        .map(|(task_id, task)| {
-            let doable = graph.has_met_dependencies(task_id).unwrap();
-            TaskRow::new(task_id, task, doable)
-        })
+     fn doable(&self) -> bool {
+         self.dependencies.0.is_empty()
+     }
 }
 
 /// Printable list of a task's dependencies

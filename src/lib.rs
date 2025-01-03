@@ -1,6 +1,5 @@
 use slab::Slab;
 use thiserror::*;
-use derive_more::Display;
 use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
@@ -51,41 +50,21 @@ impl Graph {
         let mut result = vec![];
         let mut visited = vec![false; self.tasks.capacity()];
         for (task_id, task) in &self.tasks {
-            if task.status() != TaskStatus::Selected { continue }
+            if !task.selected { continue }
             self.traverse(task_id, &mut visited, &mut result);
         }
         result
     }
 
-    pub fn set_status(&mut self, task_id: TaskId, desired_status: TaskStatus) -> Result<()> {
+    pub fn set_selected(&mut self, task_id: TaskId, selected: bool) -> Result<()> {
         let task = self.tasks.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
-        match (desired_status, task.status) {
-            (TaskStatus::Selected, TaskStatus::Finished)  => return Err(GraphError::CannotSelectFinishedTask),
-            (TaskStatus::Deselected, TaskStatus::Finished) => return Err(GraphError::CannotDeselectFinishedTask),
-            (TaskStatus::Finished, TaskStatus::Finished) => return Err(GraphError::CannotFinishFinishedTask),
-            (TaskStatus::Finished, _) => {
-                if !self.has_met_dependencies(task_id).unwrap() {
-                    return Err(GraphError::TaskDependenciesUnmet);
-                }
-            } 
-            _ => {}
-        }
-        let task = self.tasks.get_mut(task_id).unwrap();
-        task.status = desired_status;
+        task.selected = selected;
         Ok(())
     }
 
-    pub fn select_all(&mut self) {
+    pub fn set_selected_all(&mut self, selected: bool) {
         for (_task_id, task) in &mut self.tasks {
-            if task.status == TaskStatus::Finished { continue }
-            task.status = TaskStatus::Selected;
-        }
-    }
-
-    pub fn deselect_all(&mut self) {
-        for (_task_id, task) in &mut self.tasks {
-            if task.status == TaskStatus::Finished { continue }
-            task.status = TaskStatus::Deselected;
+            task.selected = selected;
         }
     }
 
@@ -103,18 +82,6 @@ impl Graph {
 
     pub fn is_empty(&self) -> bool {
         self.tasks.is_empty()
-    }
-
-    pub fn has_met_dependencies(&self, task_id: TaskId) -> Result<bool> {
-        let task = self.tasks.get(task_id).ok_or(GraphError::TaskNotFound)?;
-        if task.status == TaskStatus::Finished { return Ok(false) }
-        for child_id in task.children.iter().copied() {
-            let child = &self.tasks[child_id];
-            if child.status != TaskStatus::Finished {
-                return Ok(false);
-            }
-        }
-        Ok(true)
     }
 
     pub fn insert_child(&mut self, task_id: TaskId, child_id: TaskId) -> Result<()> {
@@ -197,7 +164,7 @@ impl Graph {
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Default, Debug)]
 pub struct Task { 
     pub name: String,
-    status: TaskStatus,
+    pub selected: bool,
     #[serde(rename="children")]
     children: Vec<TaskId>,
 }
@@ -207,26 +174,14 @@ impl Task {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            status: TaskStatus::default(),
+            selected: false,
             children: vec![],
         }
-    }
-
-    pub fn status(&self) -> TaskStatus {
-        self.status
     }
 
     pub fn children(&self) -> &[TaskId] {
         &self.children
     }
-}
-
-#[derive(Serialize, Deserialize, Display, Copy, Clone, Eq, PartialEq, Default, Debug)]
-pub enum TaskStatus {
-    #[default]
-    Deselected,
-    Selected,
-    Finished,
 }
 
 pub type TaskId = usize;
@@ -239,12 +194,6 @@ pub enum GraphError {
     TaskDependenciesUnmet,
     #[error("Cycle detected")]
     CycleDetected,
-    #[error("Cannot select finished task")]
-    CannotSelectFinishedTask,
-    #[error("Cannot deselect finished task")]
-    CannotDeselectFinishedTask,
-    #[error("Cannot finish an already finished task")]
-    CannotFinishFinishedTask,
 }
 
 pub type Result<T> = std::result::Result<T, GraphError>;
