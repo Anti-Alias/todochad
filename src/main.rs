@@ -248,7 +248,7 @@ impl<'a> TaskRow<'a> {
         Self {
             id, 
             name: &task.name, 
-            selected: false,
+            selected: task.selected,
             order: task.order, 
             dependencies: Dependencies(task.children()),
         }
