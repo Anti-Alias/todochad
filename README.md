@@ -3,7 +3,7 @@ TodoChad is a todo-list generator.
 You create tasks, create task dependencies, and mark tasks you want to prioritize. 
 TodoChad will only show you the doable tasks at any given time, making task management more manageable. 
 
-## Adding Tasks 
+Adding tasks.
 ```bash
 foo@bar:~$ tdc add "Get groceries"
 0
@@ -13,7 +13,7 @@ foo@bar:~$ tdc add "Get milk"
 2
 ```
 
-## Setting task dependencies. 
+Setting task dependencies. 
 Make "Get groceries" be dependent on "Get eggs" and "Get milk".
 Tasks can only be finished when all dependent tasks are finished.
 ```bash
@@ -21,7 +21,7 @@ foo@bar:~$ tdc depadd 0 1
 foo@bar:~$ tdc depadd 0 2 
 ```
 
-## Listing all tasks in database
+Listing all tasks in database.
 ```bash
 foo@bar:~$ tdc ls 
 +----+---------------+----------+----------+--------+--------------+
@@ -35,12 +35,12 @@ foo@bar:~$ tdc ls
 +----+---------------+----------+----------+--------+--------------+
 ```
 
-## Selecting ""Get groceries"" task, putting it, and its dependencies on the todo list.
+Selecting ""Get groceries"" task, putting it, and its dependencies on the todo list.
 ```bash
 foo@bar:~$ tdc sel 0
 ```
 
-## Shows todo list, filtering out tasks that aren't doable.
+Shows todo list, filtering out tasks that aren't doable.
 ```bash
 foo@bar:~$ tdc todo 
 +----+----------+----------+----------+--------+--------------+
@@ -52,7 +52,7 @@ foo@bar:~$ tdc todo
 +----+----------+----------+----------+--------+--------------+
 ```
 
-## Shows entire todo list 
+Shows entire todo list 
 ```bash
 foo@bar:~$ tdc todo -a
 +----+---------------+----------+----------+--------+--------------+
