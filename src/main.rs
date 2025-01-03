@@ -2,6 +2,7 @@ use std::fmt;
 use std::{env, fs};
 use std::path::{PathBuf, Path};
 use clap::{command, Parser, Subcommand};
+use ron::ser::PrettyConfig;
 use thiserror::Error;
 use tabled::{Table, Tabled};
 use tdc::{Graph, GraphError, Task, TaskId, TaskStatus};
@@ -203,7 +204,8 @@ fn load_graph(graph_path: &Path) -> Result<Graph> {
 }
 
 fn save_graph(graph_path: &Path, graph: &Graph) -> Result<()> {
-    let graph_str = ron::to_string(graph).expect("Failed to serialize graph");
+    let cfg = PrettyConfig::default();
+    let graph_str = ron::ser::to_string_pretty(graph, cfg).expect("Failed to serialize graph");
     fs::write(graph_path, graph_str).map_err(|_| AppError::GraphWriteError)?;
     Ok(())
 }
