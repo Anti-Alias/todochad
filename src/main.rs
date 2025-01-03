@@ -143,14 +143,14 @@ fn run_command(command: Command) -> Result<()> {
             let mut task_rows: Vec<TaskRow> =  task_rows
                 .filter(|task| all || task.doable)
                 .collect();
-            task_rows.sort_by_key(|task_row| (task_row.doable, task_row.selected));
+            task_rows.sort_by_key(|task_row| !task_row.doable);
             print_task_rows(&task_rows);
         },
         Command::List => {
             let graph = load_graph(&graph_path)?;
             let task_rows = map_tasks_to_rows(graph.iter(), &graph);
             let mut task_rows: Vec<TaskRow> = task_rows.collect();
-            task_rows.sort_by_key(|task_row| (task_row.selected, task_row.doable, !task_row.finished));
+            task_rows.sort_by_key(|task_row| !task_row.selected);
             print_task_rows(&task_rows);
         },
         Command::Destroy => {
@@ -276,7 +276,6 @@ impl fmt::Display for Dependencies<'_> {
         Ok(())
     }
 }
-
 
 #[derive(Error, Debug)]
 pub enum AppError {
