@@ -49,7 +49,7 @@ impl Graph {
     
     pub fn traverse_selected(&self) -> Vec<(TaskId, &Task)> {
         let mut result = vec![];
-        let mut visited = vec![false; self.tasks.len()];
+        let mut visited = vec![false; self.tasks.capacity()];
         for (task_id, task) in &self.tasks {
             if task.status() != TaskStatus::Selected { continue }
             self.traverse(task_id, &mut visited, &mut result);
@@ -153,7 +153,7 @@ impl Graph {
         if task_id_a == task_id_b { return Ok(true) }
         if !self.contains_task(task_id_b) { return Err(GraphError::TaskNotFound) }
         // Main algorithm
-        let mut visited = vec![false; self.tasks.len()];
+        let mut visited = vec![false; self.tasks.capacity()];
         visited[task_id_a] = true;
         for child_id in task_a.children.iter().copied() {
             if self._is_reachable(child_id, task_id_b, &mut visited) {
