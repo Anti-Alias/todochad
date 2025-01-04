@@ -31,6 +31,13 @@ enum Command {
         #[clap(help="Id of the task")]
         task_id: TaskId,
     }, 
+    #[command(name="rename", about="Renames a task")]
+    Rename { 
+        #[clap(help="Id of the task")]
+        task_id: TaskId,
+        #[clap(help="New name of the task")]
+        name: String,
+    }, 
     #[command(name="ls", about="List all tasks")]
     List,
     #[command(name="sel", about="Selects a task, adding it to the todo list")]
@@ -107,6 +114,12 @@ fn run_command(command: Command) -> Result<()> {
         Command::Remove { task_id } => {
             let mut graph = load_graph(&graph_path)?;
             graph.remove(task_id).ok_or(GraphError::TaskNotFound)?;
+            save_graph(&graph_path, &graph)?;
+        },
+        Command::Rename { task_id, name } => {
+            let mut graph = load_graph(&graph_path)?;
+            let task = graph.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
+            task.name = name;
             save_graph(&graph_path, &graph)?;
         },
         Command::Select { task_ids, all } => {
