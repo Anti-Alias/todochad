@@ -1,11 +1,11 @@
-use std::fmt;
-use std::{env, fs};
+use std::{env, fs, fmt};
 use std::path::{PathBuf, Path};
 use clap::{command, Parser, Subcommand};
 use ron::ser::PrettyConfig;
 use thiserror::Error;
 use tabled::{Table, Tabled};
 use tdc::{Graph, GraphError, Task, TaskId, TaskOrder };
+use glob::{Pattern, PatternError};
 
 const APP_NAME: &str        = "tdc";
 const GRAPH_FILE_NAME: &str = "graph.ron";
@@ -42,6 +42,15 @@ enum Command {
     }, 
     #[command(name="ls", about="List all tasks")]
     List,
+    #[command(name="find", about="Find tasks whose name contains the pattern provided")]
+    Find {
+        #[clap(help="Pattern to search for")]
+        pattern: String,
+        #[clap(short, long, help="Treats pattern as a glob pattern if set")]
+        glob: bool,
+        #[clap(short, long, help="Matching will be case sensitive")]
+        case_sensitive: bool,
+    },
     #[command(name="sel", about="Select a task, adding it to the todo list")]
     Select { 
         #[clap(short, long, help="Selects all tasks if set")]
@@ -181,6 +190,40 @@ fn run_command(command: Command) -> Result<()> {
             task_rows.sort_by_key(|task_row| !task_row.selected);
             print_task_rows(&task_rows);
         },
+        Command::Find { pattern, glob, case_sensitive } => {
+            let graph = load_graph(&graph_path)?;
+            let mut task_rows: Vec<TaskRow> = match (glob, case_sensitive) {
+                (false, false) => {
+                    let pattern = pattern.to_uppercase();
+                    graph.iter() 
+                        .filter(|(_, task)| task.name.to_uppercase().contains(&pattern))
+                        .map(|(task_id, task)| TaskRow::new(task_id, task))
+                        .collect()
+                },
+                (false, true) => {
+                    graph.iter() 
+                        .filter(|(_, task)| task.name.contains(&pattern))
+                        .map(|(task_id, task)| TaskRow::new(task_id, task))
+                        .collect()
+                },
+                (true, false) => {
+                    let pattern = Pattern::new(&pattern.to_uppercase())?;
+                    graph.iter() 
+                        .filter(|(_, task)| pattern.matches(&task.name.to_uppercase()))
+                        .map(|(task_id, task)| TaskRow::new(task_id, task))
+                        .collect()
+                },
+                (true, true) => {
+                    let pattern = Pattern::new(&pattern)?;
+                    graph.iter() 
+                        .filter(|(_, task)| pattern.matches(&task.name))
+                        .map(|(task_id, task)| TaskRow::new(task_id, task))
+                        .collect()
+                },
+            };
+            task_rows.sort_by_key(|task_row| !task_row.selected);
+            print_task_rows(&task_rows);
+        },
         Command::DepAdd { task_id, dependency_ids } => {
             let mut graph = load_graph(&graph_path)?;
             for dependency_id in dependency_ids {
@@ -308,6 +351,8 @@ pub enum AppError {
     GraphWriteError,
     #[error("Either a list of task ids or the -a flag must be provided")]
     MissingTaskListOrAllFlag,
+    #[error(transparent)]
+    GlobError(#[from] PatternError),
     #[error(transparent)]
     GraphError(#[from] GraphError),
 }
