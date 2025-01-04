@@ -28,10 +28,12 @@ enum Command {
     },
     #[command(name="rm", about="Remove a task")]
     Remove { 
-        #[clap(help="Id of the task")]
-        task_id: TaskId,
+        #[clap(short, long, help="Removes all tasks if set")]
+        all: bool,
+        #[clap(help="Id of the task(s)")]
+        task_ids: Vec<TaskId>,
     }, 
-    #[command(name="rename", about="Renames a task")]
+    #[command(name="rename", about="Rename a task")]
     Rename { 
         #[clap(help="Id of the task")]
         task_id: TaskId,
@@ -40,7 +42,7 @@ enum Command {
     }, 
     #[command(name="ls", about="List all tasks")]
     List,
-    #[command(name="sel", about="Selects a task, adding it to the todo list")]
+    #[command(name="sel", about="Select a task, adding it to the todo list")]
     Select { 
         #[clap(short, long, help="Selects all tasks if set")]
         all: bool,
@@ -54,26 +56,24 @@ enum Command {
         #[clap(short, long, help="Deselects all tasks if set")]
         all: bool,
     },
-    #[command(name="todo", about="Produces a todo list of tasks using currently selected tasks")]
+    #[command(name="todo", about="Show the todo list of tasks using currently selected tasks")]
     Todo {
-        #[clap(long, short, help="Show all tasks on todo list, including those with unmet dependencies")]
+        #[clap(long, short, help="Shows all tasks on todo list, including those with dependencies")]
         all: bool,
     },
-    #[command(name="destroy", about="Destroys all tasks")]
-    Destroy,
     #[command(name="depadd", about="Add dependencies to a task")]
     DepAdd {
         #[clap(help="Id of task receiving dependencies")]
         task_id: TaskId,
         #[clap(required=true, help="Ids of tasks that will added as dependencies")]
-        child_ids: Vec<TaskId>,
+        dependency_ids: Vec<TaskId>,
     },
     #[command(name="deprm", about="Remove dependencies from a task")]
     DepRemove {
         #[clap(help="Id of task removing dependencies")]
         task_id: TaskId,
         #[clap(required=true, help="Ids of tasks that will be removed as dependencies")]
-        child_ids: Vec<TaskId>,
+        dependency_ids: Vec<TaskId>,
     },
     #[command(name="depclear", about="Clear dependencies of a task")]
     DepClear {
@@ -111,9 +111,19 @@ fn run_command(command: Command) -> Result<()> {
             save_graph(&graph_path, &graph)?;
             println!("{task_id}");
         },
-        Command::Remove { task_id } => {
+        Command::Remove { task_ids, all } => {
             let mut graph = load_graph(&graph_path)?;
-            graph.remove(task_id).ok_or(GraphError::TaskNotFound)?;
+            if all {
+                graph.clear();
+            }
+            else if !task_ids.is_empty() {
+                for task_id in task_ids {
+                    graph.remove(task_id).ok_or(GraphError::TaskNotFound)?;
+                }
+            }
+            else {
+                return Err(AppError::MissingTaskListOrAllFlag);
+            }
             save_graph(&graph_path, &graph)?;
         },
         Command::Rename { task_id, name } => {
@@ -127,10 +137,13 @@ fn run_command(command: Command) -> Result<()> {
             if all {
                 graph.set_selected_all(true);
             }
-            else {
+            else if !task_ids.is_empty() {
                 for task_id in task_ids {
                     graph.set_selected(task_id, true)?;
                 }
+            }
+            else {
+                return Err(AppError::MissingTaskListOrAllFlag);
             }
             save_graph(&graph_path, &graph)?;
         },
@@ -139,10 +152,13 @@ fn run_command(command: Command) -> Result<()> {
             if all {
                 graph.set_selected_all(false);
             }
-            else {
+            else if !task_ids.is_empty() {
                 for task_id in task_ids {
                     graph.set_selected(task_id, false)?;
                 }
+            }
+            else {
+                return Err(AppError::MissingTaskListOrAllFlag);
             }
             save_graph(&graph_path, &graph)?;
         },
@@ -165,32 +181,23 @@ fn run_command(command: Command) -> Result<()> {
             task_rows.sort_by_key(|task_row| !task_row.selected);
             print_task_rows(&task_rows);
         },
-        Command::Destroy => {
-            match fs::exists(&graph_path) { 
-                Err(_) => return Err(AppError::GraphReadError),
-                Ok(false) => {},
-                Ok(true) => {
-                    std::fs::remove_file(graph_path).map_err(|_| AppError::GraphDeleteError)?;
-                },
-            }
-        },
-        Command::DepAdd { task_id, child_ids } => {
+        Command::DepAdd { task_id, dependency_ids } => {
             let mut graph = load_graph(&graph_path)?;
-            for child_id in child_ids {
-                graph.insert_child(task_id, child_id)?;
+            for dependency_id in dependency_ids {
+                graph.insert_dependency(task_id, dependency_id)?;
             }
             save_graph(&graph_path, &graph)?;
         },
-        Command::DepRemove { task_id, child_ids } => {
+        Command::DepRemove { task_id, dependency_ids } => {
             let mut graph = load_graph(&graph_path)?;
-            for child_id in child_ids {
-                graph.remove_child(task_id, child_id)?;
+            for dependency_id in dependency_ids {
+                graph.remove_dependency(task_id, dependency_id)?;
             }
             save_graph(&graph_path, &graph)?;
         },
         Command::DepClear { task_id } => {
             let mut graph = load_graph(&graph_path)?;
-            graph.clear_children(task_id)?;
+            graph.clear_dependencies(task_id)?;
             save_graph(&graph_path, &graph)?;
         },
         Command::Order { task_id, order } => {
@@ -263,7 +270,7 @@ impl<'a> TaskRow<'a> {
             name: &task.name, 
             selected: task.selected,
             order: task.order, 
-            dependencies: Dependencies(task.children()),
+            dependencies: Dependencies(task.dependencies()),
         }
     }
      fn doable(&self) -> bool {
@@ -299,8 +306,8 @@ pub enum AppError {
     GraphParseError,
     #[error("Failed to write graph file")]
     GraphWriteError,
-    #[error("Failed delete graph file")]
-    GraphDeleteError,
+    #[error("Either a list of task ids or the -a flag must be provided")]
+    MissingTaskListOrAllFlag,
     #[error(transparent)]
     GraphError(#[from] GraphError),
 }
