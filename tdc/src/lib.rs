@@ -1,7 +1,12 @@
 use slab::Slab;
 use thiserror::*;
 use serde::{Serialize, Deserialize};
+use std::{env, fs};
+use std::path::PathBuf;
 use std::fmt;
+
+pub const APP_NAME: &str    = "tdc";
+const GRAPH_FILE_NAME: &str = "graph.ron";
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Graph {
@@ -206,10 +211,28 @@ impl fmt::Display for TaskOrder {
     }
 }
 
+/// Determines the path of the graph file.
+/// Creates directory structure along the way if it does not exist.
+pub fn graph_path() -> Result<PathBuf> {
+    let home = env::var("HOME").map_err(|_| GraphError::HomeDirError)?;
+    let graph_path = format!("{home}/.local/share/{APP_NAME}/{GRAPH_FILE_NAME}");
+    let graph_path = PathBuf::from(graph_path);
+    if let Some(graph_dir) = graph_path.parent() {
+        let res = fs::create_dir_all(graph_dir);
+        if res.is_err() {
+            return Err(GraphError::HomeDirError);
+        }
+    }
+    Ok(graph_path)
+}
+
+
 pub type TaskId = usize;
 
 #[derive(Error, Debug)]
 pub enum GraphError {
+    #[error("Failed to get home directory")]
+    HomeDirError,
     #[error("Task not found")]
     TaskNotFound,
     #[error("Task has unmet dependencies")]

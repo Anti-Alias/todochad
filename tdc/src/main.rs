@@ -1,14 +1,12 @@
-use std::{env, fs, fmt};
-use std::path::{PathBuf, Path};
+use std::{fs, fmt};
+use std::path::Path;
 use clap::{command, Parser, Subcommand};
 use ron::ser::PrettyConfig;
 use thiserror::Error;
 use tabled::{Table, Tabled};
-use tdc::{Graph, GraphError, Task, TaskId, TaskOrder };
+use tdc::{Graph, GraphError, Task, TaskId, TaskOrder, graph_path };
 use glob::{Pattern, PatternError};
 
-const APP_NAME: &str        = "tdc";
-const GRAPH_FILE_NAME: &str = "graph.ron";
 
 #[derive(Parser, Debug)]
 #[command(name="tdc")]
@@ -281,20 +279,6 @@ fn save_graph(graph_path: &Path, graph: &Graph) -> Result<()> {
     Ok(())
 }
 
-/// Determines path of graph file.
-/// Creates directory structure along the way if it does not exist.
-fn graph_path() -> Result<PathBuf> {
-    let home = env::var("HOME").map_err(|_| AppError::HomeDirError)?;
-    let graph_path = format!("{home}/.local/share/{APP_NAME}/{GRAPH_FILE_NAME}");
-    let graph_path = PathBuf::from(graph_path);
-    if let Some(graph_dir) = graph_path.parent() {
-        let res = fs::create_dir_all(graph_dir);
-        if res.is_err() {
-            return Err(AppError::HomeDirError);
-        }
-    }
-    Ok(graph_path)
-}
 
 /// Printable task record
 #[derive(Tabled)]
@@ -341,8 +325,6 @@ impl fmt::Display for Dependencies<'_> {
 
 #[derive(Error, Debug)]
 pub enum AppError {
-    #[error("Failed to get home directory")]
-    HomeDirError,
     #[error("Failed to read graph file")]
     GraphReadError,
     #[error("Failed to parse graph file")]
