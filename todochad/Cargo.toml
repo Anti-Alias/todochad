@@ -4,12 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
-derive_more = { version = "1", features = ["full"] }
-glob = "0.3"
-ron = "0.8"
-serde = { version = "1", features = ["derive"] }
-slab = { version = "0.4.9", features = ["serde"] }
-tabled = "0.17"
-thiserror = "2"
+bevy = { version = "0.15.1", features=[ "dynamic_linking" ] }
+tdc = { path = "../tdc" }
+bevy_mod_ui_dsl = { git = "https://github.com/Anti-Alias/bevy_mod_ui_dsl", branch = "master" }
 
