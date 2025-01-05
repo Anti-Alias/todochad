@@ -7,4 +7,6 @@ edition = "2021"
 bevy = { version = "0.15.1", features=[ "dynamic_linking" ] }
 tdc = { path = "../tdc" }
 bevy_mod_ui_dsl = { git = "https://github.com/Anti-Alias/bevy_mod_ui_dsl", branch = "master" }
+thiserror = "2"
+rand = "0.8.5"
 

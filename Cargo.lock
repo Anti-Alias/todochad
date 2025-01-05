@@ -4041,7 +4041,9 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_mod_ui_dsl",
+ "rand",
  "tdc",
+ "thiserror 2.0.9",
 ]
 
 [[package]]
