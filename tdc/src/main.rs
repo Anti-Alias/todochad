@@ -1,7 +1,6 @@
 use std::{fs, fmt};
 use std::path::Path;
 use clap::{command, Parser, Subcommand};
-use ron::ser::PrettyConfig;
 use thiserror::Error;
 use tabled::{Table, Tabled};
 use tdc::{Graph, GraphError, Task, TaskId, TaskOrder, graph_path };
@@ -265,17 +264,16 @@ fn load_graph(graph_path: &Path) -> Result<Graph> {
         Err(_) => Err(AppError::GraphReadError),
         Ok(false) => Ok(Graph::new()),
         Ok(true) => {
-            let graph_str = fs::read_to_string(graph_path).map_err(|_| AppError::GraphReadError)?;
-            let graph = ron::from_str(&graph_str).map_err(|_| AppError::GraphParseError)?;
+            let graph_string = fs::read_to_string(graph_path).map_err(|_| AppError::GraphReadError)?;
+            let graph = Graph::read_str(&graph_string)?;
             Ok(graph)
         },
     }
 }
 
 fn save_graph(graph_path: &Path, graph: &Graph) -> Result<()> {
-    let cfg = PrettyConfig::default();
-    let graph_str = ron::ser::to_string_pretty(graph, cfg).expect("Failed to serialize graph");
-    fs::write(graph_path, graph_str).map_err(|_| AppError::GraphWriteError)?;
+    let graph_string = graph.write_string()?;
+    fs::write(graph_path, graph_string).map_err(|_| AppError::GraphWriteError)?;
     Ok(())
 }
 
@@ -327,8 +325,6 @@ impl fmt::Display for Dependencies<'_> {
 pub enum AppError {
     #[error("Failed to read graph file")]
     GraphReadError,
-    #[error("Failed to parse graph file")]
-    GraphParseError,
     #[error("Failed to write graph file")]
     GraphWriteError,
     #[error("Either a list of task ids or the -a flag must be provided")]

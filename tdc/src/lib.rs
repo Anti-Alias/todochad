@@ -1,6 +1,7 @@
 use slab::Slab;
 use thiserror::*;
 use serde::{Serialize, Deserialize};
+use ron::ser::PrettyConfig;
 use std::{env, fs};
 use std::path::PathBuf;
 use std::fmt;
@@ -17,6 +18,17 @@ impl Graph {
 
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn read_str(str: &str) -> Result<Self> {
+        let graph = ron::from_str(str).map_err(|_| GraphError::GraphParseError)?;
+        Ok(graph)
+    }
+
+    pub fn write_string(&self) -> Result<String> {
+        let cfg = PrettyConfig::default();
+        let graph_string = ron::ser::to_string_pretty(self, cfg).expect("Failed to serialize graph");
+        Ok(graph_string)
     }
 
     pub fn insert(&mut self, task: Task) -> TaskId {
@@ -233,6 +245,8 @@ pub type TaskId = usize;
 pub enum GraphError {
     #[error("Failed to get home directory")]
     HomeDirError,
+    #[error("Failed to parse graph file")]
+    GraphParseError,
     #[error("Task not found")]
     TaskNotFound,
     #[error("Task has unmet dependencies")]
