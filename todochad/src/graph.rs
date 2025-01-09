@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use rand::prelude::*;
 use tdc::TaskId;
 
@@ -14,6 +15,10 @@ pub fn graph_plugin(app: &mut App) {
     app.init_resource::<GuiAssets>();
     app.init_resource::<TaskMapping>();
     app.add_observer(spawn_graph);
+    app.add_systems(Update, (
+        draw_arrows_between_nodes,
+        handle_mouse_input,
+    ));
 }
 
 /// Resource that stores the app's graph.
@@ -112,4 +117,37 @@ fn spawn_graph(
     }
     commands.insert_resource(Graph(graph.clone()));
     commands.insert_resource(task_mapping);
+}
+
+fn draw_arrows_between_nodes(
+    task_nodes: Query<(&TaskNode, &Transform)>,
+    task_mapping: Res<TaskMapping>,
+    graph: ResMut<Graph>,
+    mut draw: Gizmos,
+) {
+    for (node, node_transf)  in &task_nodes {
+        let task = graph.get(node.task_id).unwrap();
+        for dep_task_id in task.dependencies() {
+            let dep_task_entity = task_mapping.get_entity(*dep_task_id).unwrap();
+            let (_dep_node, dep_node_transf) = task_nodes.get(dep_task_entity).unwrap();
+            draw.arrow_2d(
+                node_transf.translation.xy(), 
+                dep_node_transf.translation.xy(),
+                Color::linear_rgb(0.0, 0.0, 0.0),
+            );
+        }
+    }
+}
+
+fn handle_mouse_input(
+    windows: Query<&Window, With<PrimaryWindow>>,
+) {
+    // Gets cursor position
+    let Some(window) = windows.iter().next() else { return };
+    let Some(cursor_pos) = window.cursor_position() else { return };
+    let cursor_pos = Vec2::new(
+        cursor_pos.x - window.width() / 2.0,
+        -(cursor_pos.y - window.height() / 2.0),
+    );
+    println!("{cursor_pos:?}");
 }

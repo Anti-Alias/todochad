@@ -21,7 +21,6 @@ fn run() -> Result<()> {
         .insert_resource(Graph(graph))
         .add_plugins((DefaultPlugins, graph_plugin))
         .add_systems(Startup, startup)
-        .add_systems(Update, draw_arrows_between_nodes)
         .run();
     Ok(())
 }
@@ -29,27 +28,6 @@ fn run() -> Result<()> {
 fn startup(mut commands: Commands) {
     commands.trigger(SpawnGraph);
 }
-
-fn draw_arrows_between_nodes(
-    task_nodes: Query<(&TaskNode, &Transform)>,
-    task_mapping: Res<TaskMapping>,
-    graph: ResMut<Graph>,
-    mut draw: Gizmos,
-) {
-    for (node, node_transf)  in &task_nodes {
-        let task = graph.get(node.task_id).unwrap();
-        for dep_task_id in task.dependencies() {
-            let dep_task_entity = task_mapping.get_entity(*dep_task_id).unwrap();
-            let (_dep_node, dep_node_transf) = task_nodes.get(dep_task_entity).unwrap();
-            draw.arrow_2d(
-                node_transf.translation.xy(), 
-                dep_node_transf.translation.xy(),
-                Color::linear_rgb(0.0, 0.0, 0.0),
-            );
-        }
-    }
-}
-
 
 fn load_graph(graph_path: &Path) -> Result<tdc::Graph> {
     match fs::exists(graph_path) { 
