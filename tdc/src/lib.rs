@@ -35,18 +35,6 @@ impl Graph {
         self.tasks.insert(task)
     }
 
-    pub fn insert_with_dependencies<D>(&mut self, mut task: Task, dependencies: D) -> Result<TaskId>
-    where 
-        D: Into<Vec<TaskId>>,
-    {
-        let dependencies = dependencies.into();
-        for dependency_id in &dependencies {
-            if !self.contains_task(*dependency_id) { return Err(GraphError::TaskNotFound) }
-        }
-        task.dependencies = dependencies;
-        Ok(self.tasks.insert(task))
-    }
-
     pub fn remove(&mut self, task_id: TaskId) -> Option<Task> {
         let mut task = self.tasks.try_remove(task_id)?;
         task.dependencies.clear();
@@ -274,19 +262,6 @@ mod test {
     }
 
     #[test]
-    fn test_insert_with_dependencies() {
-        let mut graph = Graph::new();
-        let find_keys_id = graph.insert(Task::new("Find Keys"));
-        let find_wallet_id  = graph.insert(Task::new("Find Wallet"));
-        let get_groceries_id = graph
-            .insert_with_dependencies(Task::new("Get Groceries"), [find_keys_id, find_wallet_id])
-            .unwrap();
-        let get_groceries = graph.get(get_groceries_id).unwrap();
-        assert_eq!(get_groceries.name.as_str(), "Get Groceries");
-        assert_eq!(get_groceries.dependencies, &[find_keys_id, find_wallet_id]);
-    }
-
-    #[test]
     fn test_insert_dependency() {
         let mut graph = Graph::new();
         let find_keys_id        = graph.insert(Task::new("Find Keys"));
@@ -304,9 +279,9 @@ mod test {
         let mut graph = Graph::new();
         let find_keys_id = graph.insert(Task::new("Find Keys"));
         let find_wallet_id  = graph.insert(Task::new("Find Wallet"));
-        let get_groceries_id = graph
-            .insert_with_dependencies(Task::new("Get Groceries"), [find_keys_id, find_wallet_id])
-            .unwrap();
+        let get_groceries_id    = graph.insert(Task::new("Get Groceries"));
+        graph.insert_dependency(get_groceries_id, find_keys_id).unwrap();
+        graph.insert_dependency(get_groceries_id, find_wallet_id).unwrap();
         graph.remove(find_keys_id);
         let get_groceries = graph.get(get_groceries_id).unwrap();
         assert_eq!(get_groceries.dependencies, &[find_wallet_id]);
