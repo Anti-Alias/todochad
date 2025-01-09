@@ -1,5 +1,7 @@
 # TodoChad
-Parent project of the TodoChad CLI and the TodoChad UI projects.
+Parent project to the 
+[TodoChad CLI](https://github.com/Anti-Alias/todochad/tree/master/tdc) and the 
+[TodoChad UI](https://github.com/Anti-Alias/todochad/tree/master/todochad) projects.
 
 ## CLI build instructions 
 The CLI tool can be built with [cargo](https://www.rust-lang.org/tools/install) using the following command:
