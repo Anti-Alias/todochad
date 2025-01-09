@@ -1,5 +1,5 @@
-# TodoChad
-TodoChad is a Linux cli todo list generator.
+# TodoChad CLI
+TodoChad CLI is a Linux cli todo list generator.
 Use it to create tasks with task dependencies, forming a "graph".
 Selecting a task will put it, and its sub tasks, on a todo list.
 
