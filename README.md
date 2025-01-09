@@ -6,12 +6,12 @@ Parent project to the
 ## CLI Build Instructions 
 The CLI tool can be built with [cargo](https://www.rust-lang.org/tools/install) using the following command:
 ```bash
-cargo build --bin tdc
+cargo build --bin tdc --release
 ```
 
 ## UI Build Instructions 
 First, make sure that you've installed the necessary OS dependencies outlined in the [Bevy Quickstart guide](https://bevyengine.org/learn/quick-start/getting-started/setup/).
 Then, the UI app can built with [cargo](https://www.rust-lang.org/tools/install) using the following command:
 ```bash
-cargo build --bin todochad
+cargo build --bin todochad --release
 ```
