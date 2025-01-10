@@ -5,6 +5,8 @@ use tabled::{Table, Tabled};
 use tdc::{Config, ConfigError, Graph, GraphError, Task, TaskId, TaskOrder};
 use glob::{Pattern, PatternError};
 
+const INDENT: &str = "    ";
+
 
 #[derive(Parser, Debug)]
 #[command(name="tdc")]
@@ -38,6 +40,11 @@ enum Command {
     }, 
     #[command(name="ls", about="List all tasks")]
     List,
+    #[command(name="tree", about="Prints a tree view of one or more tasks and their dependencies")]
+    Tree {
+        #[clap(help="Id of the task(s)")]
+        task_ids: Vec<TaskId>,
+    },
     #[command(name="find", about="Find tasks whose name contains the pattern provided")]
     Find {
         #[clap(help="Pattern to search for")]
@@ -176,7 +183,8 @@ fn run_command(command: Command) -> Result<()> {
                 .filter(|task| all || task.doable())
                 .collect();
             task_rows.sort_by_key(|task_row| (!task_row.doable(), task_row.order));
-            print_task_rows(&task_rows);
+            let task_table = Table::new(task_rows);
+            println!("{task_table}");
         },
         Command::List => {
             let graph = Graph::load(&config)?;
@@ -184,7 +192,16 @@ fn run_command(command: Command) -> Result<()> {
                 .map(|(task_id, task)| TaskRow::new(task_id, task))
                 .collect();
             task_rows.sort_by_key(|task_row| !task_row.selected);
-            print_task_rows(&task_rows);
+            let task_table = Table::new(task_rows);
+            println!("{task_table}");
+        },
+        Command::Tree { task_ids } => {
+            let graph = Graph::load(&config)?;
+            for task_id in task_ids {
+                let task = graph.get(task_id).ok_or(GraphError::TaskNotFound)?;
+                let task_tree = TaskTree { task_id, task, graph: &graph };
+                print!("{task_tree}");
+            }
         },
         Command::Find { pattern, glob, case_sensitive } => {
             let graph = Graph::load(&config)?;
@@ -218,7 +235,8 @@ fn run_command(command: Command) -> Result<()> {
                 },
             };
             task_rows.sort_by_key(|task_row| !task_row.selected);
-            print_task_rows(&task_rows);
+            let task_table = Table::new(task_rows);
+            println!("{task_table}");
         },
         Command::DepAdd { task_id, dependency_ids } => {
             let mut graph = Graph::load(&config)?;
@@ -253,9 +271,34 @@ fn run_command(command: Command) -> Result<()> {
     Ok(())
 }
 
-fn print_task_rows(task_rows: &[TaskRow]) {
-    let task_table = Table::new(task_rows);
-    println!("{task_table}");
+struct TaskTree<'a> {
+    task_id: TaskId,
+    task: &'a Task,
+    graph: &'a Graph,
+}
+
+impl fmt::Display for TaskTree<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        print_task_tree(self.task_id, &self.task, &self.graph, 0, f)
+    }
+}
+
+fn print_task_tree(
+    task_id: TaskId,
+    task: &Task,
+    graph: &Graph,
+    indentation: u32,
+    f: &mut fmt::Formatter,
+) -> fmt::Result {
+    for _ in 0..indentation {
+        write!(f, "{}", INDENT)?;
+    }
+    writeln!(f, "{}) {}", task_id, task.name)?;
+    for dep_id in task.dependencies().iter().copied() {
+        let dep_task = graph.get(dep_id).unwrap();
+        print_task_tree(dep_id, dep_task, graph, indentation + 1, f)?;
+    }
+    Ok(())
 }
 
 
