@@ -3,7 +3,8 @@ TodoChad CLI is a Linux cli todo list generator.
 Use it to create tasks with task dependencies, forming a "graph".
 Selecting a task will put it, and its sub tasks, on a todo list.
 
-Database file is stored in `~/.local/share/tdc/graph.ron`
+By default, database file is stored in `~/.local/share/tdc/graph.ron`
+This can be configured by modifying the `~/.config/tdc/config.ron` file.
 
 ## Usage 
 
@@ -27,7 +28,6 @@ foo@bar:~$ tdc todo
 | id | name | selected | dependencies |
 +----+------+----------+--------------+
 ```
-
 
 Our todo list is empty because we haven't selected any tasks. Let's do that.
 ```bash

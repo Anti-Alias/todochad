@@ -72,7 +72,6 @@ impl FromWorld for GuiAssets {
 // Events that trigger graph behaviors in the application.
 pub mod actions {
     use bevy::prelude::*;
-    use tdc::Graph;
 
     #[derive(Event)]
     pub struct SpawnGraph;

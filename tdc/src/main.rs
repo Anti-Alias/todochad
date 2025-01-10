@@ -1,9 +1,8 @@
-use std::{fs, fmt};
-use std::path::Path;
+use std::fmt;
 use clap::{command, Parser, Subcommand};
 use thiserror::Error;
 use tabled::{Table, Tabled};
-use tdc::{Graph, GraphError, Task, TaskId, TaskOrder, graph_path };
+use tdc::{Config, ConfigError, Graph, GraphError, Task, TaskId, TaskOrder};
 use glob::{Pattern, PatternError};
 
 
@@ -109,16 +108,16 @@ fn run() -> Result<()> {
 
 /// Runs a command on a graph.
 fn run_command(command: Command) -> Result<()> {
-    let graph_path = graph_path()?;
+    let config = Config::load()?;
     match command {
         Command::Add { task_name } => {
-            let mut graph = load_graph(&graph_path)?;
+            let mut graph = Graph::load(&config)?;
             let task_id = graph.insert(Task::new(task_name));
-            save_graph(&graph_path, &graph)?;
+            graph.save(&config)?;
             println!("{task_id}");
         },
         Command::Remove { task_ids, all } => {
-            let mut graph = load_graph(&graph_path)?;
+            let mut graph = Graph::load(&config)?;
             if all {
                 graph.clear();
             }
@@ -130,16 +129,16 @@ fn run_command(command: Command) -> Result<()> {
             else {
                 return Err(AppError::MissingTaskListOrAllFlag);
             }
-            save_graph(&graph_path, &graph)?;
+            graph.save(&config)?;
         },
         Command::Rename { task_id, name } => {
-            let mut graph = load_graph(&graph_path)?;
+            let mut graph = Graph::load(&config)?;
             let task = graph.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
             task.name = name;
-            save_graph(&graph_path, &graph)?;
+            graph.save(&config)?;
         },
         Command::Select { task_ids, all } => {
-            let mut graph = load_graph(&graph_path)?;
+            let mut graph = Graph::load(&config)?;
             if all {
                 graph.set_selected_all(true);
             }
@@ -151,10 +150,10 @@ fn run_command(command: Command) -> Result<()> {
             else {
                 return Err(AppError::MissingTaskListOrAllFlag);
             }
-            save_graph(&graph_path, &graph)?;
+            graph.save(&config)?;
         },
         Command::Deselect { task_ids, all } => {
-            let mut graph = load_graph(&graph_path)?;
+            let mut graph = Graph::load(&config)?;
             if all {
                 graph.set_selected_all(false);
             }
@@ -166,10 +165,10 @@ fn run_command(command: Command) -> Result<()> {
             else {
                 return Err(AppError::MissingTaskListOrAllFlag);
             }
-            save_graph(&graph_path, &graph)?;
+            graph.save(&config)?;
         },
         Command::Todo { all } => {
-            let graph = load_graph(&graph_path)?;
+            let graph = Graph::load(&config)?;
             let tasks = graph.traverse_selected();
             let mut task_rows: Vec<TaskRow> = tasks
                 .into_iter()
@@ -180,7 +179,7 @@ fn run_command(command: Command) -> Result<()> {
             print_task_rows(&task_rows);
         },
         Command::List => {
-            let graph = load_graph(&graph_path)?;
+            let graph = Graph::load(&config)?;
             let mut task_rows: Vec<TaskRow> = graph.iter() 
                 .map(|(task_id, task)| TaskRow::new(task_id, task))
                 .collect();
@@ -188,7 +187,7 @@ fn run_command(command: Command) -> Result<()> {
             print_task_rows(&task_rows);
         },
         Command::Find { pattern, glob, case_sensitive } => {
-            let graph = load_graph(&graph_path)?;
+            let graph = Graph::load(&config)?;
             let mut task_rows: Vec<TaskRow> = match (glob, case_sensitive) {
                 (false, false) => {
                     let pattern = pattern.to_uppercase();
@@ -222,33 +221,33 @@ fn run_command(command: Command) -> Result<()> {
             print_task_rows(&task_rows);
         },
         Command::DepAdd { task_id, dependency_ids } => {
-            let mut graph = load_graph(&graph_path)?;
+            let mut graph = Graph::load(&config)?;
             for dependency_id in dependency_ids {
                 graph.insert_dependency(task_id, dependency_id)?;
             }
-            save_graph(&graph_path, &graph)?;
+            graph.save(&config)?;
         },
         Command::DepRemove { task_id, dependency_ids } => {
-            let mut graph = load_graph(&graph_path)?;
+            let mut graph = Graph::load(&config)?;
             for dependency_id in dependency_ids {
                 graph.remove_dependency(task_id, dependency_id)?;
             }
-            save_graph(&graph_path, &graph)?;
+            graph.save(&config)?;
         },
         Command::DepClear { task_id } => {
-            let mut graph = load_graph(&graph_path)?;
+            let mut graph = Graph::load(&config)?;
             graph.clear_dependencies(task_id)?;
-            save_graph(&graph_path, &graph)?;
+            graph.save(&config)?;
         },
         Command::Order { task_id, order } => {
-            let mut graph = load_graph(&graph_path)?;
+            let mut graph = Graph::load(&config)?;
             let task = graph.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
             let order = match order { 
                 Some(order) => TaskOrder::Order(order),
                 None => TaskOrder::Last,
             };
             task.order = order;
-            save_graph(&graph_path, &graph)?;
+            graph.save(&config)?;
         },
     }
     Ok(())
@@ -257,24 +256,6 @@ fn run_command(command: Command) -> Result<()> {
 fn print_task_rows(task_rows: &[TaskRow]) {
     let task_table = Table::new(task_rows);
     println!("{task_table}");
-}
-
-fn load_graph(graph_path: &Path) -> Result<Graph> {
-    match fs::exists(graph_path) { 
-        Err(_) => Err(AppError::GraphReadError),
-        Ok(false) => Ok(Graph::new()),
-        Ok(true) => {
-            let graph_string = fs::read_to_string(graph_path).map_err(|_| AppError::GraphReadError)?;
-            let graph = Graph::read_str(&graph_string)?;
-            Ok(graph)
-        },
-    }
-}
-
-fn save_graph(graph_path: &Path, graph: &Graph) -> Result<()> {
-    let graph_string = graph.write_string()?;
-    fs::write(graph_path, graph_string).map_err(|_| AppError::GraphWriteError)?;
-    Ok(())
 }
 
 
@@ -323,10 +304,8 @@ impl fmt::Display for Dependencies<'_> {
 
 #[derive(Error, Debug)]
 pub enum AppError {
-    #[error("Failed to read graph file")]
-    GraphReadError,
-    #[error("Failed to write graph file")]
-    GraphWriteError,
+    #[error(transparent)]
+    ConfigError(#[from] ConfigError),
     #[error("Either a list of task ids or the -a flag must be provided")]
     MissingTaskListOrAllFlag,
     #[error(transparent)]
