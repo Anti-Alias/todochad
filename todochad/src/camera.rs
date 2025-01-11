@@ -123,7 +123,7 @@ pub enum DragState {
 pub struct Draggable;
 
 #[derive(Resource, Debug)]
-pub struct Zoom(f32);
+pub struct Zoom(pub f32);
 impl Zoom {
     pub fn scale(&self) -> f32 {
         self.0 * self.0

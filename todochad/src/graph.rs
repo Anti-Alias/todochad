@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 use rand::prelude::*;
 use tdc::TaskId;
-use bevy::prelude::*;
+use bevy::{prelude::*, text::TextBounds};
 
-use crate::{Draggable, MainCamera};
+use crate::{Draggable, MainCamera, Zoom};
 
-const TASK_WIDTH: f32 = 17.0;
-const TASK_HEIGHT: f32 = 25.0;
+const TASK_NODE_SIZE: Vec2 = Vec2::new(200.0, 50.0);
 const MIN_X: f32 = -500.0;
 const MIN_Y: f32 = -500.0;
 const MAX_X: f32 = 500.0;
@@ -54,9 +53,8 @@ impl TaskMapping {
 /// Stores assets for the entire UI
 #[derive(Resource, Debug)]
 pub struct GuiAssets {
-    pub circle: Handle<Mesh>,
-    pub task_color: Handle<ColorMaterial>,
-    pub task_selected_color: Handle<ColorMaterial>,
+    pub task_color: Color,
+    pub task_selected_color: Color, 
     pub task_font: TextFont, 
 }
 
@@ -64,13 +62,11 @@ impl FromWorld for GuiAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.resource::<AssetServer>();
         let font = assets.load("fonts/0xProtoNerdFont-Regular.ttf");
-        let task_font = TextFont { font, font_size: 16.0, ..default() };
-        let mut meshes = world.resource_mut::<Assets<Mesh>>();
-        let circle = meshes.add(Rectangle::new(TASK_WIDTH, TASK_HEIGHT));
-        let mut materials = world.resource_mut::<Assets<ColorMaterial>>();
-        let task_color = materials.add(Color::linear_rgb(0.1, 0.1, 0.1));
-        let task_selected_color = materials.add(Color::linear_rgb(0.05, 0.25, 0.05));
-        Self { circle, task_color, task_selected_color, task_font }
+        Self {
+            task_color: Color::linear_rgb(0.1, 0.1, 0.1),
+            task_selected_color: Color::linear_rgb(0.05, 0.25, 0.05),
+            task_font: TextFont { font, font_size: 12.0, ..default() },
+        }
     }
 }
 
@@ -96,29 +92,25 @@ fn spawn_graph(
 
     // Spawns task nodes, and maps them to tasks in the graph
     let mut rng = thread_rng();
+    let mut z = 0.0;
     for (task_id, task) in graph.iter() {
         let x: f32 = rng.gen_range(MIN_X..MAX_X);
         let y: f32 = rng.gen_range(MIN_Y..MAX_Y);
-        let scale = Vec3::new(task.name.len() as f32, 1.0, 1.0);
-        let color = match task.selected {
-            false => gui_assets.task_color.clone(),
-            true => gui_assets.task_selected_color.clone(),
-        };
+        let color = if !task.selected { gui_assets.task_color } else { gui_assets.task_selected_color };
         let task_entity = commands.spawn((
+            Sprite::from_color(color, TASK_NODE_SIZE),
             TaskNode { task_id },
-            Transform::from_xyz(x, y, 0.0),
-        )).with_children(|p| {
-            p.spawn((
-                Mesh2d(gui_assets.circle.clone()),
-                MeshMaterial2d(color),
-                Transform::from_scale(scale),
-            ));
-            p.spawn((
-                Text2d(task.name.clone()),
-                gui_assets.task_font.clone(),
-            ));
-        }).id();
+            Transform::from_xyz(x, y, z),
+        )).with_child((
+            Text2d(task.name.clone()),
+            TextBounds::new(TASK_NODE_SIZE.x, TASK_NODE_SIZE.y),
+            Transform::from_translation(Vec3::new(0.0, 0.0, 0.0001)),
+            gui_assets.task_font.clone(),
+        ))
+        .observe(handle_dragging)
+        .id();
         task_mapping.insert(task_id, task_entity);
+        z += 10.0;
     }
     commands.insert_resource(Graph(graph.clone()));
     commands.insert_resource(task_mapping);
@@ -144,3 +136,14 @@ fn draw_arrows_between_nodes(
     }
 }
 
+fn handle_dragging(
+    trigger: Trigger<Pointer<Drag>>,
+    mut transf_q: Query<&mut Transform>,
+    zoom: Res<Zoom>,
+) {
+    let (entity, event) = (trigger.entity(), trigger.event());
+    if event.button != PointerButton::Primary { return };
+    let mut transf = transf_q.get_mut(entity).unwrap();
+    transf.translation.x += event.delta.x * zoom.scale(); 
+    transf.translation.y -= event.delta.y * zoom.scale(); 
+}
