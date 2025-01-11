@@ -1,8 +1,9 @@
 use std::collections::HashMap;
-use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
 use rand::prelude::*;
 use tdc::TaskId;
+use bevy::prelude::*;
+
+use crate::{Draggable, MainCamera};
 
 const TASK_WIDTH: f32 = 17.0;
 const TASK_HEIGHT: f32 = 25.0;
@@ -11,14 +12,19 @@ const MIN_Y: f32 = -500.0;
 const MAX_X: f32 = 500.0;
 const MAX_Y: f32 = 500.0;
 
-pub fn graph_plugin(app: &mut App) {
-    app.init_resource::<GuiAssets>();
-    app.init_resource::<TaskMapping>();
-    app.add_observer(spawn_graph);
-    app.add_systems(Update, (
-        draw_arrows_between_nodes,
-        handle_mouse_input,
-    ));
+#[derive(Debug)]
+pub struct GraphPlugin {
+    pub graph: tdc::Graph,
+}
+
+impl Plugin for GraphPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(Graph(self.graph.clone()));
+        app.init_resource::<GuiAssets>();
+        app.init_resource::<TaskMapping>();
+        app.add_observer(spawn_graph);
+        app.add_systems(Update, draw_arrows_between_nodes);
+    }
 }
 
 /// Resource that stores the app's graph.
@@ -86,7 +92,7 @@ fn spawn_graph(
     gui_assets: Res<GuiAssets>,
 ) {
     let mut task_mapping = TaskMapping::default();
-    commands.spawn(Camera2d);
+    commands.spawn((Camera2d, MainCamera, Draggable));
 
     // Spawns task nodes, and maps them to tasks in the graph
     let mut rng = thread_rng();
@@ -138,15 +144,3 @@ fn draw_arrows_between_nodes(
     }
 }
 
-fn handle_mouse_input(
-    windows: Query<&Window, With<PrimaryWindow>>,
-) {
-    // Gets cursor position
-    let Some(window) = windows.iter().next() else { return };
-    let Some(cursor_pos) = window.cursor_position() else { return };
-    let cursor_pos = Vec2::new(
-        cursor_pos.x - window.width() / 2.0,
-        -(cursor_pos.y - window.height() / 2.0),
-    );
-    println!("{cursor_pos:?}");
-}

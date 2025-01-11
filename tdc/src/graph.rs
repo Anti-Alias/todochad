@@ -5,11 +5,8 @@ use ron::ser::PrettyConfig;
 use std::{fs, fmt};
 use crate::Config;
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
-pub struct Graph {
-   tasks: Slab<Task>,
-}
-
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub struct Graph { tasks: Slab<Task> }
 impl Graph {
 
     pub fn new() -> Self {

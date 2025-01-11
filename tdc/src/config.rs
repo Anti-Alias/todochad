@@ -9,12 +9,8 @@ const CONFIG_FILE_NAME: &str    = "config.ron";
 const GRAPH_FILE_NAME: &str     = "graph.ron";
 
 /// TodoChad application configuration
-#[derive(Serialize, Deserialize)]
-pub struct Config {
-    /// Path to the the graph database file
-    pub graph_path: PathBuf,
-}
-
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Debug)]
+pub struct Config { pub graph_path: PathBuf }
 impl Config {
 
     /// Loads the config file from its standard location, creating it if it does not exist.

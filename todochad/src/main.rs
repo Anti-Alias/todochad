@@ -1,8 +1,12 @@
-use todochad::*;
-use todochad::actions::*;
+mod graph;
+mod camera;
+
+use graph::*;
+use graph::actions::*;
+use camera::*;
+
 use bevy::prelude::*;
 use thiserror::*;
-use tdc::{ Config, ConfigError, Graph, GraphError };
 
 fn main() {
     if let Err(err) = run() {
@@ -12,11 +16,14 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    let config = Config::load()?;
-    let graph = Graph::load(&config)?;
+    let config = tdc::Config::load()?;
+    let graph = tdc::Graph::load(&config)?;
     App::new()
-        .insert_resource(Graph(graph))
-        .add_plugins((DefaultPlugins, graph_plugin))
+        .add_plugins((
+            DefaultPlugins, 
+            GraphPlugin { graph },
+            camera_pan_plugin,
+        ))
         .add_systems(Startup, startup)
         .run();
     Ok(())
@@ -29,9 +36,9 @@ fn startup(mut commands: Commands) {
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error(transparent)]
-    ConfigError(#[from] ConfigError),
+    ConfigError(#[from] tdc::ConfigError),
     #[error(transparent)]
-    GraphError(#[from] GraphError),
+    GraphError(#[from] tdc::GraphError),
 }
 
 type Result<T> = std::result::Result<T, AppError>;
