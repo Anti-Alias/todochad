@@ -184,7 +184,7 @@ fn c_text(text: &mut TextW, font: &TextFont) {
 fn c_todo_text(text: &mut TextW, font: &TextFont) {
     text.text_color = Color::srgba(1.0, 1.0, 0.5, 1.0).into();
     text.text_font = font.clone();
-    text.nde.margin = UiRect::px(0.0, 0.0, 5.0, 5.0);
+    text.node.margin = UiRect::px(0.0, 0.0, 5.0, 5.0);
 }
 
 fn c_todo_disabled_text(text: &mut TextW, font: &TextFont) {
