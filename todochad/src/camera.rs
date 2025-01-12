@@ -2,13 +2,18 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
+const CAM_SPEED: f32 = 10.0;
+const CAM_ZOOM_SPEED_KEYBOARD: f32 = 0.1;
+const CAM_ZOOM_MIN: f32 = 0.5;
+const CAM_ZOOM_MAX: f32 = 3.0;
+
 pub fn camera_pan_plugin(app: &mut App) {
     app.init_resource::<Cursor>();
     app.init_resource::<Zoom>();
     app.add_systems(Update, 
         (
             read_cursor, 
-            (drag_entity, scale_camera),
+            (drag_entity, control_camera),
         ).chain()
     );
 }
@@ -69,17 +74,46 @@ fn drag_entity(
     transf.translation = Vec3::new(translation.x, translation.y, 0.0);
 }
 
-fn scale_camera(
+fn control_camera(
     mut camera_q: Query<&mut Transform, With<MainCamera>>,
     mut scroll_events: EventReader<MouseWheel>,
     mut zoom: ResMut<Zoom>,
+    keyboard: Res<ButtonInput<KeyCode>>,
 ) {
+    // Scales camera using scroll wheel
     let Ok(mut cam_transf) = camera_q.get_single_mut() else { return };
     for scroll_event in scroll_events.read() {
         let MouseScrollUnit::Line = scroll_event.unit else { continue };
         zoom.0 -= scroll_event.y * 0.1;
-        zoom.0 = zoom.0.clamp(0.5, 3.0);
-        cam_transf.scale = Vec3::splat(zoom.scale());
+    }
+
+    // Scales camera using + and - keys
+    let ctrl_pressed = keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight);
+    if ctrl_pressed && keyboard.just_pressed(KeyCode::Equal) {
+        zoom.0 -= CAM_ZOOM_SPEED_KEYBOARD; 
+    }
+    if ctrl_pressed && keyboard.just_pressed(KeyCode::Minus) {
+        zoom.0 += CAM_ZOOM_SPEED_KEYBOARD; 
+    }
+
+    // Applies zoom to camera scaling
+    zoom.0 = zoom.0.clamp(CAM_ZOOM_MIN, CAM_ZOOM_MAX);
+    cam_transf.scale = Vec3::splat(zoom.scale());
+
+    // Moves camera using arrow keys
+    if keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD) { 
+        cam_transf.translation.x += CAM_SPEED;
+    }
+
+    if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) { 
+        cam_transf.translation.x -= CAM_SPEED;
+    }
+
+    if keyboard.pressed(KeyCode::ArrowUp) || keyboard.pressed(KeyCode::KeyW) { 
+        cam_transf.translation.y += CAM_SPEED;
+    }
+    if keyboard.pressed(KeyCode::ArrowDown) || keyboard.pressed(KeyCode::KeyS) { 
+        cam_transf.translation.y -= CAM_SPEED;
     }
 }
 
