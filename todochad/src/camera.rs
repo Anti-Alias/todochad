@@ -2,7 +2,7 @@ use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
-const CAM_SPEED: f32 = 10.0;
+const CAM_SPEED: f32 = 1000.0;
 const CAM_ZOOM_SPEED_KEYBOARD: f32 = 0.1;
 const CAM_ZOOM_MIN: f32 = 0.5;
 const CAM_ZOOM_MAX: f32 = 3.0;
@@ -79,6 +79,7 @@ fn control_camera(
     mut scroll_events: EventReader<MouseWheel>,
     mut zoom: ResMut<Zoom>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
 ) {
     // Scales camera using scroll wheel
     let Ok(mut cam_transf) = camera_q.get_single_mut() else { return };
@@ -102,18 +103,18 @@ fn control_camera(
 
     // Moves camera using arrow keys
     if keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD) { 
-        cam_transf.translation.x += CAM_SPEED;
+        cam_transf.translation.x += CAM_SPEED * time.delta_secs();
     }
 
     if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) { 
-        cam_transf.translation.x -= CAM_SPEED;
+        cam_transf.translation.x -= CAM_SPEED * time.delta_secs();
     }
 
     if keyboard.pressed(KeyCode::ArrowUp) || keyboard.pressed(KeyCode::KeyW) { 
-        cam_transf.translation.y += CAM_SPEED;
+        cam_transf.translation.y += CAM_SPEED * time.delta_secs();
     }
     if keyboard.pressed(KeyCode::ArrowDown) || keyboard.pressed(KeyCode::KeyS) { 
-        cam_transf.translation.y -= CAM_SPEED;
+        cam_transf.translation.y -= CAM_SPEED * time.delta_secs();
     }
 }
 
