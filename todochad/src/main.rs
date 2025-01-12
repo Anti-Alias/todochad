@@ -29,6 +29,7 @@ fn run() -> Result<()> {
             graph_ui_plugin,
         ))
         .add_systems(Startup, startup)
+        .insert_resource(ClearColor(Color::srgb(0.1, 0.1, 0.1)))
         .run();
     Ok(())
 }

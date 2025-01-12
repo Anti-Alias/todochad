@@ -55,8 +55,8 @@ fn render_left_panel(
 
         // Task group 
         if let Some(_task_id) = panel.current_task {
+            TextW::new("Current Task").config(c_header, header_font).insert(s);
             NodeW::new().cfg(c_group).begin(s);
-                TextW::new("Current Task").config(c_header, header_font).insert(s);
                 NodeW::new().begin(s);
                     TextW::new("Name: ").config(c_text, font).insert(s);
                     TextW::new("Steve").config(c_text, font).insert(s);
@@ -73,8 +73,8 @@ fn render_left_panel(
         }
 
         // Action group 
+        TextW::new("Actions").config(c_header, header_font).insert(s);
         NodeW::new().cfg(c_group).begin(s);
-            TextW::new("Actions").config(c_header, header_font).insert(s);
             NodeW::new().begin(s);
                 ButtonW::new().cfg(c_button_primary).begin(s);
                     let new_task_e = s.last();
@@ -126,6 +126,7 @@ fn render_right_panel(
 
     NodeW::new().cfg(c_side_panel).begin(s);
         TextW::new("Todo List").config(c_header, header_font).insert(s);
+        NodeW::new().cfg(c_group).begin(s);
         for task_info in panel.todo_task_infos.iter() {
             let task = info.graph.get(task_info.task_id).unwrap();
             if task_info.doable {
@@ -135,6 +136,7 @@ fn render_right_panel(
                 TextW::new(&task.name).config(c_todo_disabled_text, font).insert(s);
             }
         }
+        NodeW::end(s);
     NodeW::end(s);
 }
 
@@ -150,7 +152,6 @@ pub mod event {
 fn c_side_panel(node: &mut NodeW) {
     node.node.flex_direction = FlexDirection::Column;
     node.node.align_items = AlignItems::Start;
-    node.node.padding = UiRect::px(10.0, 0.0, 5.0, 0.0);
     node.node.width = Val::Px(300.0);
     node.node.height = Val::Percent(100.0);
     node.background_color = Color::srgb(0.3, 0.3, 0.3).into();
@@ -158,7 +159,7 @@ fn c_side_panel(node: &mut NodeW) {
 
 fn c_group(node: &mut NodeW) {
     node.node.flex_direction = FlexDirection::Column;
-    node.node.margin = UiRect::bottom(Val::Px(10.0));
+    node.node.margin = UiRect::px(15.0, 0.0, 0.0, 10.0);
 }
 
 fn c_button_primary(button: &mut ButtonW) {
@@ -195,7 +196,7 @@ fn c_todo_disabled_text(text: &mut TextW, font: &TextFont) {
 
 fn c_header(text: &mut TextW, font: &TextFont) {
     text.text_font = font.clone();
-    text.node.margin = UiRect::bottom(Val::Px(5.0));
+    text.node.margin = UiRect::px(7.0, 0.0, 5.0, 5.0);
 }
 
 fn new_task_on_press(_trigger: Trigger<Pointer<Down>>) {

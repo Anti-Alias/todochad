@@ -5,11 +5,14 @@ use bevy::{prelude::*, text::TextBounds};
 
 use crate::{Draggable, MainCamera, Zoom};
 
-const TASK_NODE_SIZE: Vec2 = Vec2::new(200.0, 50.0);
-const MIN_X: f32 = -500.0;
-const MIN_Y: f32 = -500.0;
-const MAX_X: f32 = 500.0;
-const MAX_Y: f32 = 500.0;
+const TASK_COLOR: Color             = Color::srgb(0.1, 0.3, 0.5);
+const TASK_SELECTED_COLOR: Color    = Color::srgb(0.1, 0.6, 0.3);
+const TASK_NODE_SIZE: Vec2          = Vec2::new(200.0, 50.0);
+const LINE_COLOR: Color             = Color::srgb(0.8, 0.5, 0.2);
+const MIN_X: f32    = -500.0;
+const MIN_Y: f32    = -500.0;
+const MAX_X: f32    = 500.0;
+const MAX_Y: f32    = 500.0;
 
 #[derive(Debug)]
 pub struct GraphPlugin {
@@ -60,8 +63,6 @@ impl TaskMapping {
 /// Stores assets for the entire UI
 #[derive(Resource, Debug)]
 pub struct GuiAssets {
-    pub task_color: Color,
-    pub task_selected_color: Color, 
     pub task_font: TextFont, 
     pub ui_font: TextFont, 
     pub ui_header_font: TextFont, 
@@ -72,8 +73,6 @@ impl FromWorld for GuiAssets {
         let assets = world.resource::<AssetServer>();
         let font = assets.load("fonts/0xProtoNerdFont-Regular.ttf");
         Self {
-            task_color: Color::linear_rgb(0.1, 0.1, 0.1),
-            task_selected_color: Color::linear_rgb(0.05, 0.25, 0.05),
             task_font: TextFont { font: font.clone(), font_size: 12.0, ..default() },
             ui_font: TextFont { font: font.clone(), font_size: 12.0, ..default() },
             ui_header_font: TextFont { font: font.clone(), font_size: 20.0, ..default() },
@@ -105,7 +104,7 @@ fn spawn_graph(
     let mut z = 0.0;
     for (task_id, task) in info.graph.iter() {
         let (x, y) = get_task_position(task.xy);
-        let color = if !task.selected { gui_assets.task_color } else { gui_assets.task_selected_color };
+        let color = if !task.selected { TASK_COLOR } else { TASK_SELECTED_COLOR };
         let task_e = commands.spawn((
             Sprite::from_color(color, TASK_NODE_SIZE),
             TaskNode { task_id },
@@ -142,16 +141,21 @@ fn draw_arrows_between_nodes(
     info: ResMut<GraphInfo>,
     mut draw: Gizmos,
 ) {
+    let task_half_size = TASK_NODE_SIZE / 2.0;
     for (node, node_transf)  in &task_nodes {
         let task = info.graph.get(node.task_id).unwrap();
+        let task_min = node_transf.translation.xy() - task_half_size; 
+        let task_max = node_transf.translation.xy() + task_half_size; 
         for dep_task_id in task.dependencies() {
             let dep_task_entity = task_mapping.get_entity(*dep_task_id).unwrap();
             let (_dep_node, dep_node_transf) = task_nodes.get(dep_task_entity).unwrap();
-            draw.arrow_2d(
-                node_transf.translation.xy(), 
-                dep_node_transf.translation.xy(),
-                Color::linear_rgb(0.0, 0.0, 0.0),
-            );
+            let dep_min = dep_node_transf.translation.xy() - task_half_size; 
+            let dep_max = dep_node_transf.translation.xy() + task_half_size; 
+            let line_start = node_transf.translation.xy();
+            let line_end = dep_node_transf.translation.xy();
+            let line_start = trim_line_on_box(line_end, line_start, task_min, task_max);
+            let line_end = trim_line_on_box(line_start, line_end, dep_min, dep_max);
+            draw.arrow_2d(line_start, line_end, LINE_COLOR);
         }
     }
 }
@@ -177,4 +181,12 @@ fn sync_task_xy(
         let task = info.graph.get_mut(task_node.task_id).unwrap();
         task.xy = Some((xyz.x, xyz.y));
     }
+}
+
+fn trim_line_on_box(a: Vec2, mut b: Vec2, box_min: Vec2, box_max: Vec2) -> Vec2 {
+    if a.x < box_min.x && b.x > box_min.x { b.x = box_min.x; }
+    if a.x > box_max.x && b.x < box_max.x { b.x = box_max.x; }
+    if a.y < box_min.y && b.y > box_min.y { b.y = box_min.y; }
+    if a.y > box_max.y && b.y < box_max.y { b.y = box_max.y; }
+    b
 }
