@@ -13,22 +13,29 @@ const MAX_Y: f32 = 500.0;
 
 #[derive(Debug)]
 pub struct GraphPlugin {
+    pub config: tdc::Config,
     pub graph: tdc::Graph,
 }
 
 impl Plugin for GraphPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(Graph(self.graph.clone()));
+        app.insert_resource(GraphInfo {
+            config: self.config.clone(),
+            graph: self.graph.clone(),
+        });
         app.init_resource::<GuiAssets>();
         app.init_resource::<TaskMapping>();
         app.add_observer(spawn_graph);
-        app.add_systems(Update, draw_arrows_between_nodes);
+        app.add_systems(Update, (draw_arrows_between_nodes, sync_task_xy));
     }
 }
 
 /// Resource that stores the app's graph.
-#[derive(Resource, Deref, DerefMut)]
-pub struct Graph(pub tdc::Graph);
+#[derive(Resource)]
+pub struct GraphInfo {
+    pub config: tdc::Config,
+    pub graph: tdc::Graph,
+}
 
 /// Component storing a reference to a task in the graph.
 #[derive(Component, Copy, Clone, Eq, PartialEq, Default, Debug)]
@@ -56,6 +63,8 @@ pub struct GuiAssets {
     pub task_color: Color,
     pub task_selected_color: Color, 
     pub task_font: TextFont, 
+    pub ui_font: TextFont, 
+    pub ui_header_font: TextFont, 
 }
 
 impl FromWorld for GuiAssets {
@@ -65,14 +74,16 @@ impl FromWorld for GuiAssets {
         Self {
             task_color: Color::linear_rgb(0.1, 0.1, 0.1),
             task_selected_color: Color::linear_rgb(0.05, 0.25, 0.05),
-            task_font: TextFont { font, font_size: 12.0, ..default() },
+            task_font: TextFont { font: font.clone(), font_size: 12.0, ..default() },
+            ui_font: TextFont { font: font.clone(), font_size: 12.0, ..default() },
+            ui_header_font: TextFont { font: font.clone(), font_size: 20.0, ..default() },
         }
     }
 }
 
 
 // Events that trigger graph behaviors in the application.
-pub mod actions {
+pub mod event {
     use bevy::prelude::*;
 
     #[derive(Event)]
@@ -82,8 +93,8 @@ pub mod actions {
 /// Spawns graph + tasks when triggered.
 /// Used at application startup.
 fn spawn_graph(
-    _event: Trigger<actions::SpawnGraph>,
-    graph: Res<Graph>,
+    _event: Trigger<event::SpawnGraph>,
+    info: Res<GraphInfo>,
     mut commands: Commands, 
     gui_assets: Res<GuiAssets>,
 ) {
@@ -91,13 +102,11 @@ fn spawn_graph(
     commands.spawn((Camera2d, MainCamera, Draggable));
 
     // Spawns task nodes, and maps them to tasks in the graph
-    let mut rng = thread_rng();
     let mut z = 0.0;
-    for (task_id, task) in graph.iter() {
-        let x: f32 = rng.gen_range(MIN_X..MAX_X);
-        let y: f32 = rng.gen_range(MIN_Y..MAX_Y);
+    for (task_id, task) in info.graph.iter() {
+        let (x, y) = get_task_position(task.xy);
         let color = if !task.selected { gui_assets.task_color } else { gui_assets.task_selected_color };
-        let task_entity = commands.spawn((
+        let task_e = commands.spawn((
             Sprite::from_color(color, TASK_NODE_SIZE),
             TaskNode { task_id },
             Transform::from_xyz(x, y, z),
@@ -109,21 +118,32 @@ fn spawn_graph(
         ))
         .observe(handle_dragging)
         .id();
-        task_mapping.insert(task_id, task_entity);
-        z += 10.0;
+        task_mapping.insert(task_id, task_e);
+        z += 1.0;
     }
-    commands.insert_resource(Graph(graph.clone()));
     commands.insert_resource(task_mapping);
+}
+
+fn get_task_position(pos: Option<(f32, f32)>) -> (f32, f32) {
+    match pos {
+        Some((x, y)) => (x, y),
+        None => {
+            let mut rng = thread_rng();
+            let x = rng.gen_range(MIN_X..MAX_X);
+            let y = rng.gen_range(MIN_Y..MAX_Y);
+            (x, y)
+        }
+    }
 }
 
 fn draw_arrows_between_nodes(
     task_nodes: Query<(&TaskNode, &Transform)>,
     task_mapping: Res<TaskMapping>,
-    graph: ResMut<Graph>,
+    info: ResMut<GraphInfo>,
     mut draw: Gizmos,
 ) {
     for (node, node_transf)  in &task_nodes {
-        let task = graph.get(node.task_id).unwrap();
+        let task = info.graph.get(node.task_id).unwrap();
         for dep_task_id in task.dependencies() {
             let dep_task_entity = task_mapping.get_entity(*dep_task_id).unwrap();
             let (_dep_node, dep_node_transf) = task_nodes.get(dep_task_entity).unwrap();
@@ -146,4 +166,15 @@ fn handle_dragging(
     let mut transf = transf_q.get_mut(entity).unwrap();
     transf.translation.x += event.delta.x * zoom.scale(); 
     transf.translation.y -= event.delta.y * zoom.scale(); 
+}
+
+fn sync_task_xy(
+    mut info: ResMut<GraphInfo>,
+    mut tasks: Query<(&TaskNode, &mut Transform), Changed<Transform>>,
+) {
+    for (task_node, task_transf) in &mut tasks {
+        let xyz = task_transf.translation;
+        let task = info.graph.get_mut(task_node.task_id).unwrap();
+        task.xy = Some((xyz.x, xyz.y));
+    }
 }

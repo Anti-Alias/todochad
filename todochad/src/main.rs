@@ -1,8 +1,11 @@
 mod graph;
+mod ui;
 mod camera;
 
 use graph::*;
-use graph::actions::*;
+use graph::event::*;
+use ui::*;
+use ui::event::*;
 use camera::*;
 
 use bevy::prelude::*;
@@ -21,8 +24,9 @@ fn run() -> Result<()> {
     App::new()
         .add_plugins((
             DefaultPlugins, 
-            GraphPlugin { graph },
+            GraphPlugin { config, graph },
             camera_pan_plugin,
+            graph_ui_plugin,
         ))
         .add_systems(Startup, startup)
         .run();
@@ -31,6 +35,7 @@ fn run() -> Result<()> {
 
 fn startup(mut commands: Commands) {
     commands.trigger(SpawnGraph);
+    commands.trigger(SpawnLeftPanel);
 }
 
 #[derive(Error, Debug)]

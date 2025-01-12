@@ -174,11 +174,13 @@ impl Graph {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Default, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Default, Debug)]
 pub struct Task {
     pub name: String,
     pub selected: bool,
     pub order: TaskOrder,
+    #[serde(default)]
+    pub xy: Option<(f32, f32)>,
     dependencies: Vec<TaskId>,
 }
 
@@ -189,6 +191,7 @@ impl Task {
             name: name.into(),
             selected: false,
             order: TaskOrder::default(),
+            xy: None,
             dependencies: vec![],
         }
     }
