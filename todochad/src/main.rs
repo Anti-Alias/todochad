@@ -36,6 +36,7 @@ fn run() -> Result<()> {
 fn startup(mut commands: Commands) {
     commands.trigger(SpawnGraph);
     commands.trigger(SpawnLeftPanel);
+    commands.trigger(SpawnRightPanel);
 }
 
 #[derive(Error, Debug)]

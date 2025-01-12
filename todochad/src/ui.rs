@@ -1,17 +1,29 @@
 use bevy::prelude::*;
 use bevy_mod_ui_dsl::*;
-
 use crate::{GraphInfo, GuiAssets};
 
 pub fn graph_ui_plugin(app: &mut App) {
     app.add_observer(spawn_left_panel);
-    app.add_systems(Update, render_left_panel);
+    app.add_observer(spawn_right_panel);
+    app.add_systems(Update, (render_left_panel, render_right_panel));
 }
 
 #[derive(Component, Debug)]
 #[require(Node)]
 pub struct LeftPanel {
     current_task: Option<tdc::TaskId>,
+}
+
+#[derive(Component, Debug)]
+#[require(Node)]
+pub struct RightPanel {
+    todo_task_infos: Vec<TaskInfo>,
+}
+
+#[derive(Debug)]
+struct TaskInfo {
+    task_id: tdc::TaskId,
+    doable: bool,
 }
 
 fn spawn_left_panel(_trigger: Trigger<event::SpawnLeftPanel>, mut commands: Commands) {
@@ -35,11 +47,11 @@ fn render_left_panel(
     gui_assets: Res<GuiAssets>,
 ) {
     let Some((panel_e, panel)) = left_panel_q.iter_mut().next() else { return };
-
     let s = &mut Spawner::relative(panel_e, &mut commands);
     let header_font = &gui_assets.ui_header_font;
     let font = &gui_assets.ui_font;
-    NodeW::new().cfg(c_left_panel).begin(s);
+
+    NodeW::new().cfg(c_side_panel).begin(s);
 
         // Task group 
         if let Some(_task_id) = panel.current_task {
@@ -81,14 +93,61 @@ fn render_left_panel(
     commands.entity(save_e).observe(save_on_press);
 }
 
+fn spawn_right_panel(
+    _trigger: Trigger<event::SpawnRightPanel>,
+    info: Res<GraphInfo>,
+    mut commands: Commands,
+) {
+    let todo_task_infos = generate_task_infos(&info.graph);
+    commands.spawn((
+        RightPanel { todo_task_infos },
+        BackgroundColor(Color::srgb(0.3, 0.3, 0.3)),
+        Node {
+            flex_direction: FlexDirection::Column,
+            width: Val::Px(300.0),
+            height: Val::Percent(100.0),
+            position_type: PositionType::Absolute,
+            right: Val::Px(0.0),
+            ..default()
+        }
+    ));
+}
+
+fn render_right_panel(
+    mut commands: Commands,
+    mut right_panel_q: Query<(Entity, &RightPanel), Changed<RightPanel>>,
+    gui_assets: Res<GuiAssets>,
+    info: Res<GraphInfo>,
+) {
+    let Some((panel_e, panel)) = right_panel_q.iter_mut().next() else { return };
+    let s = &mut Spawner::relative(panel_e, &mut commands);
+    let header_font = &gui_assets.ui_header_font;
+    let font = &gui_assets.ui_font;
+
+    NodeW::new().cfg(c_side_panel).begin(s);
+        TextW::new("Todo List").config(c_header, header_font).insert(s);
+        for task_info in panel.todo_task_infos.iter() {
+            let task = info.graph.get(task_info.task_id).unwrap();
+            if task_info.doable {
+                TextW::new(&task.name).config(c_todo_text, font).insert(s);
+            }
+            else {
+                TextW::new(&task.name).config(c_todo_disabled_text, font).insert(s);
+            }
+        }
+    NodeW::end(s);
+}
+
 pub mod event {
     use bevy::prelude::*;
 
     #[derive(Event, Debug)]
     pub struct SpawnLeftPanel;
+    #[derive(Event, Debug)]
+    pub struct SpawnRightPanel;
 }
 
-fn c_left_panel(node: &mut NodeW) {
+fn c_side_panel(node: &mut NodeW) {
     node.node.flex_direction = FlexDirection::Column;
     node.node.align_items = AlignItems::Start;
     node.node.padding = UiRect::px(10.0, 0.0, 5.0, 0.0);
@@ -122,6 +181,18 @@ fn c_text(text: &mut TextW, font: &TextFont) {
     text.text_font = font.clone();
 }
 
+fn c_todo_text(text: &mut TextW, font: &TextFont) {
+    text.text_color = Color::srgba(1.0, 1.0, 0.5, 1.0).into();
+    text.text_font = font.clone();
+    text.nde.margin = UiRect::px(0.0, 0.0, 5.0, 5.0);
+}
+
+fn c_todo_disabled_text(text: &mut TextW, font: &TextFont) {
+    text.text_color = Color::srgba(1.0, 1.0, 1.0, 0.5).into();
+    text.text_font = font.clone();
+    text.node.margin = UiRect::px(0.0, 0.0, 5.0, 5.0);
+}
+
 fn c_header(text: &mut TextW, font: &TextFont) {
     text.text_font = font.clone();
     text.node.margin = UiRect::bottom(Val::Px(5.0));
@@ -139,4 +210,17 @@ fn save_on_press(
     if event.button != PointerButton::Primary { return };
     let GraphInfo { config, graph } = &*info;
     graph.save(config).expect("Failed to save graph");
+}
+
+fn generate_task_infos(graph: &tdc::Graph) -> Vec<TaskInfo> {
+    let mut task_infos: Vec<TaskInfo> = graph
+        .traverse_selected()
+        .into_iter()
+        .map(|(task_id, task)| TaskInfo {
+            task_id,
+            doable: task.dependencies().is_empty(),
+        })
+        .collect();
+    task_infos.sort_by_key(|task_info| !task_info.doable);
+    task_infos
 }
