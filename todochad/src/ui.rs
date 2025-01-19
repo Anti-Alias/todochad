@@ -26,7 +26,7 @@ struct TaskInfo {
     doable: bool,
 }
 
-fn spawn_left_panel(_trigger: Trigger<event::SpawnLeftPanel>, mut commands: Commands) {
+fn spawn_left_panel(_trigger: Trigger<action::SpawnLeftPanel>, mut commands: Commands) {
     commands.spawn((
         LeftPanel { current_task: Some(0) },
         BackgroundColor(Color::srgb(0.3, 0.3, 0.3)),
@@ -51,38 +51,38 @@ fn render_left_panel(
     let header_font = &gui_assets.ui_header_font;
     let font = &gui_assets.ui_font;
 
-    NodeW::new().cfg(c_side_panel).begin(s);
+    NodeW::new().cfg(cfg::side_panel).begin(s);
 
         // Task group 
         if let Some(_task_id) = panel.current_task {
-            TextW::new("Current Task").config(c_header, header_font).insert(s);
-            NodeW::new().cfg(c_group).begin(s);
+            TextW::new("Current Task").config(cfg::header, header_font).insert(s);
+            NodeW::new().cfg(cfg::group).begin(s);
                 NodeW::new().begin(s);
-                    TextW::new("Name: ").config(c_text, font).insert(s);
-                    TextW::new("Steve").config(c_text, font).insert(s);
+                    TextW::new("Name: ").config(cfg::text, font).insert(s);
+                    TextW::new("Steve").config(cfg::text, font).insert(s);
                 NodeW::end(s);
                 NodeW::new().begin(s);
-                    TextW::new("Created: ").config(c_text, font).insert(s);
-                    TextW::new("<DATE>").config(c_text, font).insert(s);
+                    TextW::new("Created: ").config(cfg::text, font).insert(s);
+                    TextW::new("<DATE>").config(cfg::text, font).insert(s);
                 NodeW::end(s);
                 NodeW::new().begin(s);
-                    TextW::new("Updated: ").config(c_text, font).insert(s);
-                    TextW::new("<DATE>").config(c_text, font).insert(s);
+                    TextW::new("Updated: ").config(cfg::text, font).insert(s);
+                    TextW::new("<DATE>").config(cfg::text, font).insert(s);
                 NodeW::end(s);
             NodeW::end(s);
         }
 
         // Action group 
-        TextW::new("Actions").config(c_header, header_font).insert(s);
-        NodeW::new().cfg(c_group).begin(s);
+        TextW::new("Actions").config(cfg::header, header_font).insert(s);
+        NodeW::new().cfg(cfg::group).begin(s);
             NodeW::new().begin(s);
-                ButtonW::new().cfg(c_button_primary).begin(s);
+                ButtonW::new().cfg(cfg::button_primary).begin(s);
                     let new_task_e = s.last();
-                    TextW::new("New Task").config(c_text, font).insert(s);
+                    TextW::new("New Task").config(cfg::text, font).insert(s);
                 ButtonW::end(s);
-                ButtonW::new().cfg(c_button_secondary).begin(s);
+                ButtonW::new().cfg(cfg::button_secondary).begin(s);
                     let save_e = s.last();
-                    TextW::new("Save").config(c_text, font).insert(s);
+                    TextW::new("Save").config(cfg::text, font).insert(s);
                 ButtonW::end(s);
             NodeW::end(s);
         NodeW::end(s);
@@ -94,7 +94,7 @@ fn render_left_panel(
 }
 
 fn spawn_right_panel(
-    _trigger: Trigger<event::SpawnRightPanel>,
+    _trigger: Trigger<action::SpawnRightPanel>,
     info: Res<GraphInfo>,
     mut commands: Commands,
 ) {
@@ -124,79 +124,20 @@ fn render_right_panel(
     let header_font = &gui_assets.ui_header_font;
     let font = &gui_assets.ui_font;
 
-    NodeW::new().cfg(c_side_panel).begin(s);
-        TextW::new("Todo List").config(c_header, header_font).insert(s);
-        NodeW::new().cfg(c_group).begin(s);
+    NodeW::new().cfg(cfg::side_panel).begin(s);
+        TextW::new("Todo List").config(cfg::header, header_font).insert(s);
+        NodeW::new().cfg(cfg::group).begin(s);
         for task_info in panel.todo_task_infos.iter() {
             let task = info.graph.get(task_info.task_id).unwrap();
             if task_info.doable {
-                TextW::new(&task.name).config(c_todo_text, font).insert(s);
+                TextW::new(&task.name).config(cfg::todo_text, font).insert(s);
             }
             else {
-                TextW::new(&task.name).config(c_todo_disabled_text, font).insert(s);
+                TextW::new(&task.name).config(cfg::todo_disabled_text, font).insert(s);
             }
         }
         NodeW::end(s);
     NodeW::end(s);
-}
-
-pub mod event {
-    use bevy::prelude::*;
-
-    #[derive(Event, Debug)]
-    pub struct SpawnLeftPanel;
-    #[derive(Event, Debug)]
-    pub struct SpawnRightPanel;
-}
-
-fn c_side_panel(node: &mut NodeW) {
-    node.node.flex_direction = FlexDirection::Column;
-    node.node.align_items = AlignItems::Start;
-    node.node.width = Val::Px(300.0);
-    node.node.height = Val::Percent(100.0);
-    node.background_color = Color::srgb(0.3, 0.3, 0.3).into();
-}
-
-fn c_group(node: &mut NodeW) {
-    node.node.flex_direction = FlexDirection::Column;
-    node.node.margin = UiRect::px(15.0, 0.0, 0.0, 10.0);
-}
-
-fn c_button_primary(button: &mut ButtonW) {
-    button.node.justify_content = JustifyContent::Center;
-    button.background_color = Color::srgb(0.1, 0.6, 0.2).into();
-    button.node.padding = UiRect::all(Val::Px(5.0));
-    button.node.margin = UiRect::right(Val::Px(5.0));
-    button.border_radius = BorderRadius::all(Val::Px(3.0));
-}
-
-fn c_button_secondary(button: &mut ButtonW) {
-    button.node.justify_content = JustifyContent::Center;
-    button.background_color = Color::srgb(0.1, 0.2, 0.6).into();
-    button.node.padding = UiRect::all(Val::Px(5.0));
-    button.node.margin = UiRect::right(Val::Px(5.0));
-    button.border_radius = BorderRadius::all(Val::Px(3.0));
-}
-
-fn c_text(text: &mut TextW, font: &TextFont) {
-    text.text_font = font.clone();
-}
-
-fn c_todo_text(text: &mut TextW, font: &TextFont) {
-    text.text_color = Color::srgba(1.0, 1.0, 0.5, 1.0).into();
-    text.text_font = font.clone();
-    text.node.margin = UiRect::px(0.0, 0.0, 5.0, 5.0);
-}
-
-fn c_todo_disabled_text(text: &mut TextW, font: &TextFont) {
-    text.text_color = Color::srgba(1.0, 1.0, 1.0, 0.5).into();
-    text.text_font = font.clone();
-    text.node.margin = UiRect::px(0.0, 0.0, 5.0, 5.0);
-}
-
-fn c_header(text: &mut TextW, font: &TextFont) {
-    text.text_font = font.clone();
-    text.node.margin = UiRect::px(7.0, 0.0, 5.0, 5.0);
 }
 
 fn new_task_on_press(_trigger: Trigger<Pointer<Down>>) {
@@ -224,4 +165,70 @@ fn generate_task_infos(graph: &tdc::Graph) -> Vec<TaskInfo> {
         .collect();
     task_infos.sort_by_key(|task_info| !task_info.doable);
     task_infos
+}
+
+/// Actions that drive UI behavior.
+pub mod action {
+    use bevy::prelude::*;
+
+    #[derive(Event, Debug)]
+    pub struct SpawnLeftPanel;
+    #[derive(Event, Debug)]
+    pub struct SpawnRightPanel;
+}
+
+/// Config functions for widgets
+mod cfg {
+    use bevy::prelude::*;
+    use bevy_mod_ui_dsl::*;
+
+    pub fn side_panel(node: &mut NodeW) {
+        node.node.flex_direction = FlexDirection::Column;
+        node.node.align_items = AlignItems::Start;
+        node.node.width = Val::Px(300.0);
+        node.node.height = Val::Percent(100.0);
+        node.background_color = Color::srgb(0.3, 0.3, 0.3).into();
+    }
+
+    pub fn group(node: &mut NodeW) {
+        node.node.flex_direction = FlexDirection::Column;
+        node.node.margin = UiRect::px(15.0, 0.0, 0.0, 10.0);
+    }
+
+    pub fn button_primary(button: &mut ButtonW) {
+        button.node.justify_content = JustifyContent::Center;
+        button.background_color = Color::srgb(0.1, 0.6, 0.2).into();
+        button.node.padding = UiRect::all(Val::Px(5.0));
+        button.node.margin = UiRect::right(Val::Px(5.0));
+        button.border_radius = BorderRadius::all(Val::Px(3.0));
+    }
+
+    pub fn button_secondary(button: &mut ButtonW) {
+        button.node.justify_content = JustifyContent::Center;
+        button.background_color = Color::srgb(0.1, 0.2, 0.6).into();
+        button.node.padding = UiRect::all(Val::Px(5.0));
+        button.node.margin = UiRect::right(Val::Px(5.0));
+        button.border_radius = BorderRadius::all(Val::Px(3.0));
+    }
+
+    pub fn text(text: &mut TextW, font: &TextFont) {
+        text.text_font = font.clone();
+    }
+
+    pub fn todo_text(text: &mut TextW, font: &TextFont) {
+        text.text_color = Color::srgba(1.0, 1.0, 0.5, 1.0).into();
+        text.text_font = font.clone();
+        text.node.margin = UiRect::px(0.0, 0.0, 5.0, 5.0);
+    }
+
+    pub fn todo_disabled_text(text: &mut TextW, font: &TextFont) {
+        text.text_color = Color::srgba(1.0, 1.0, 1.0, 0.5).into();
+        text.text_font = font.clone();
+        text.node.margin = UiRect::px(0.0, 0.0, 5.0, 5.0);
+    }
+
+    pub fn header(text: &mut TextW, font: &TextFont) {
+        text.text_font = font.clone();
+        text.node.margin = UiRect::px(7.0, 0.0, 5.0, 5.0);
+    }
 }

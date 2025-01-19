@@ -5,7 +5,7 @@ mod camera;
 use graph::*;
 use graph::event::*;
 use ui::*;
-use ui::event::*;
+use ui::action::*;
 use camera::*;
 
 use bevy::prelude::*;
