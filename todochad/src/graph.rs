@@ -1,9 +1,12 @@
-use std::collections::HashMap;
+use crate::cursor::{pointer_on_over, default_on_out};
 use rand::prelude::*;
+use bevy::prelude::*;
+use bevy::text::TextBounds;
+use std::collections::HashMap;
 use tdc::TaskId;
-use bevy::{prelude::*, text::TextBounds};
+pub use action::*;
 
-use crate::{Draggable, MainCamera, Zoom};
+use crate::Zoom;
 
 const TASK_COLOR: Color             = Color::srgb(0.1, 0.3, 0.5);
 const TASK_SELECTED_COLOR: Color    = Color::srgb(0.1, 0.6, 0.3);
@@ -81,8 +84,8 @@ impl FromWorld for GuiAssets {
 }
 
 
-// Events that trigger graph behaviors in the application.
-pub mod event {
+/// Events that trigger graph behaviors in the application.
+mod action {
     use bevy::prelude::*;
 
     #[derive(Event)]
@@ -92,15 +95,12 @@ pub mod event {
 /// Spawns graph + tasks when triggered.
 /// Used at application startup.
 fn spawn_graph(
-    _event: Trigger<event::SpawnGraph>,
+    _trigger: Trigger<SpawnGraph>,
     info: Res<GraphInfo>,
-    mut commands: Commands, 
     gui_assets: Res<GuiAssets>,
+    mut commands: Commands, 
 ) {
     let mut task_mapping = TaskMapping::default();
-    commands.spawn((Camera2d, MainCamera, Draggable));
-
-    // Spawns task nodes, and maps them to tasks in the graph
     let mut z = 0.0;
     for (task_id, task) in info.graph.iter() {
         let (x, y) = get_task_position(task.xy);
@@ -116,6 +116,8 @@ fn spawn_graph(
             gui_assets.task_font.clone(),
         ))
         .observe(handle_dragging)
+        .observe(pointer_on_over)
+        .observe(default_on_out)
         .id();
         task_mapping.insert(task_id, task_e);
         z += 1.0;

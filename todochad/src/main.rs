@@ -1,11 +1,10 @@
 mod graph;
 mod ui;
 mod camera;
+pub mod cursor;
 
 use graph::*;
-use graph::event::*;
 use ui::*;
-use ui::action::*;
 use camera::*;
 
 use bevy::prelude::*;
@@ -26,7 +25,7 @@ fn run() -> Result<()> {
             DefaultPlugins, 
             GraphPlugin { config, graph },
             camera_pan_plugin,
-            graph_ui_plugin,
+            chad_ui_plugin,
         ))
         .add_systems(Startup, startup)
         .insert_resource(ClearColor(Color::srgb(0.1, 0.1, 0.1)))
@@ -35,6 +34,7 @@ fn run() -> Result<()> {
 }
 
 fn startup(mut commands: Commands) {
+    commands.spawn((Camera2d, MainCamera, Draggable));
     commands.trigger(SpawnGraph);
     commands.trigger(SpawnLeftPanel);
     commands.trigger(SpawnRightPanel);

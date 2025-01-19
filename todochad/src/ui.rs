@@ -1,8 +1,10 @@
 use bevy::prelude::*;
 use bevy_mod_ui_dsl::*;
 use crate::{GraphInfo, GuiAssets};
+use crate::cursor::{pointer_on_over, default_on_out};
+pub use action::*;
 
-pub fn graph_ui_plugin(app: &mut App) {
+pub fn chad_ui_plugin(app: &mut App) {
     app.add_observer(spawn_left_panel);
     app.add_observer(spawn_right_panel);
     app.add_systems(Update, (render_left_panel, render_right_panel));
@@ -89,8 +91,16 @@ fn render_left_panel(
     NodeW::end(s);
 
     // Callbacks
-    commands.entity(new_task_e).observe(new_task_on_press);
-    commands.entity(save_e).observe(save_on_press);
+    commands
+        .entity(new_task_e)
+        .observe(pointer_on_over)
+        .observe(default_on_out)
+        .observe(new_task_on_press);
+    commands
+        .entity(save_e)
+        .observe(pointer_on_over)
+        .observe(default_on_out)
+        .observe(save_on_press);
 }
 
 fn spawn_right_panel(
@@ -123,8 +133,8 @@ fn render_right_panel(
     let s = &mut Spawner::relative(panel_e, &mut commands);
     let header_font = &gui_assets.ui_header_font;
     let font = &gui_assets.ui_font;
-
     NodeW::new().cfg(cfg::side_panel).begin(s);
+
         TextW::new("Todo List").config(cfg::header, header_font).insert(s);
         NodeW::new().cfg(cfg::group).begin(s);
         for task_info in panel.todo_task_infos.iter() {
@@ -139,6 +149,7 @@ fn render_right_panel(
         NodeW::end(s);
     NodeW::end(s);
 }
+
 
 fn new_task_on_press(_trigger: Trigger<Pointer<Down>>) {
     // TODO
@@ -168,7 +179,7 @@ fn generate_task_infos(graph: &tdc::Graph) -> Vec<TaskInfo> {
 }
 
 /// Actions that drive UI behavior.
-pub mod action {
+mod action {
     use bevy::prelude::*;
 
     #[derive(Event, Debug)]
