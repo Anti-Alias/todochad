@@ -4,16 +4,16 @@ use bevy::window::PrimaryWindow;
 
 const CAM_SPEED: f32 = 1000.0;
 const CAM_ZOOM_SPEED_KEYBOARD: f32 = 0.1;
+const CAM_ZOOM_SPEED_WHEEL: f32 = 0.1;
 const CAM_ZOOM_MIN: f32 = 0.5;
 const CAM_ZOOM_MAX: f32 = 3.0;
 
 pub fn camera_pan_plugin(app: &mut App) {
     app.init_resource::<Cursor>();
-    app.init_resource::<Zoom>();
     app.add_systems(Update, 
         (
             read_cursor, 
-            (drag_entity, control_camera),
+            (drag_camera, control_camera),
         ).chain()
     );
 }
@@ -55,66 +55,65 @@ fn read_cursor(
     }
 }
 
-fn drag_entity(
-    cursor: ResMut<Cursor>,
-    mut draggable_q: Query<&mut Transform>,
-    zoom: Res<Zoom>,
+fn drag_camera(
+    cursor: ResMut<Cursor>, 
+    mut camera_q: Query<(&mut Transform, &OrthographicProjection), With<MainCamera>>,
 ) {
+    let Ok((mut cam_transf, cam_proj)) = camera_q.get_single_mut() else { return };
     let DragState::Dragging { 
-        entity, 
         cursor_press_position, 
         entity_press_position,
         reverse,
+        ..
     } = cursor.drag_state else { return };
 
     let coef = if reverse { -1.0 } else { 1.0 };
-    let Ok(mut transf) = draggable_q.get_mut(entity) else { return };
     let cursor_translation = cursor.position - cursor_press_position;
-    let translation = entity_press_position + zoom.scale() * coef * cursor_translation;
-    transf.translation = Vec3::new(translation.x, translation.y, 0.0);
+    let translation = entity_press_position + cam_proj.scale * coef * cursor_translation;
+    cam_transf.translation = translation.extend(0.0);
 }
 
 fn control_camera(
-    mut camera_q: Query<&mut Transform, With<MainCamera>>,
+    mut camera_q: Query<(&mut Transform, &mut OrthographicProjection), With<MainCamera>>,
     mut scroll_events: EventReader<MouseWheel>,
-    mut zoom: ResMut<Zoom>,
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
     // Scales camera using scroll wheel
-    let Ok(mut cam_transf) = camera_q.get_single_mut() else { return };
+    let Ok((mut cam_transf, mut cam_proj)) = camera_q.get_single_mut() else { return };
     for scroll_event in scroll_events.read() {
         let MouseScrollUnit::Line = scroll_event.unit else { continue };
-        zoom.0 -= scroll_event.y * 0.1;
+        cam_proj.scale -= CAM_ZOOM_SPEED_WHEEL * scroll_event.y;
     }
 
     // Scales camera using + and - keys
     let ctrl_pressed = keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight);
     if ctrl_pressed && keyboard.just_pressed(KeyCode::Equal) {
-        zoom.0 -= CAM_ZOOM_SPEED_KEYBOARD; 
+        cam_proj.scale -= CAM_ZOOM_SPEED_KEYBOARD; 
     }
     if ctrl_pressed && keyboard.just_pressed(KeyCode::Minus) {
-        zoom.0 += CAM_ZOOM_SPEED_KEYBOARD; 
+        cam_proj.scale += CAM_ZOOM_SPEED_KEYBOARD; 
     }
-
-    // Applies zoom to camera scaling
-    zoom.0 = zoom.0.clamp(CAM_ZOOM_MIN, CAM_ZOOM_MAX);
-    cam_transf.scale = Vec3::splat(zoom.scale());
+    if ctrl_pressed && keyboard.just_pressed(KeyCode::Digit0) {
+        cam_proj.scale = 1.0;
+    }
+    cam_proj.scale = cam_proj.scale.clamp(CAM_ZOOM_MIN, CAM_ZOOM_MAX);
 
     // Moves camera using arrow keys
+    let cam_speed = CAM_SPEED * cam_proj.scale;
     if keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD) { 
-        cam_transf.translation.x += CAM_SPEED * time.delta_secs();
+        cam_transf.translation.x += cam_speed * time.delta_secs();
     }
 
     if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) { 
-        cam_transf.translation.x -= CAM_SPEED * time.delta_secs();
+        cam_transf.translation.x -= cam_speed * time.delta_secs();
     }
 
     if keyboard.pressed(KeyCode::ArrowUp) || keyboard.pressed(KeyCode::KeyW) { 
-        cam_transf.translation.y += CAM_SPEED * time.delta_secs();
+        cam_transf.translation.y += cam_speed * time.delta_secs();
     }
     if keyboard.pressed(KeyCode::ArrowDown) || keyboard.pressed(KeyCode::KeyS) { 
-        cam_transf.translation.y -= CAM_SPEED * time.delta_secs();
+        cam_transf.translation.y -= cam_speed * time.delta_secs();
     }
 }
 
@@ -157,16 +156,3 @@ pub enum DragState {
 #[derive(Component, Debug)]
 pub struct Draggable;
 
-#[derive(Resource, Debug)]
-pub struct Zoom(pub f32);
-impl Zoom {
-    pub fn scale(&self) -> f32 {
-        self.0 * self.0
-    }
-}
-
-impl Default for Zoom {
-    fn default() -> Self {
-        Self(1.0)
-    }
-}

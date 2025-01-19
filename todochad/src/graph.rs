@@ -6,12 +6,14 @@ use std::collections::HashMap;
 use tdc::TaskId;
 pub use action::*;
 
-use crate::Zoom;
+use crate::MainCamera;
 
 const TASK_COLOR: Color             = Color::srgb(0.1, 0.3, 0.5);
 const TASK_SELECTED_COLOR: Color    = Color::srgb(0.1, 0.6, 0.3);
-const TASK_NODE_SIZE: Vec2          = Vec2::new(200.0, 50.0);
+const TASK_NODE_SIZE: Vec2          = Vec2::new(7.0 * GRID_SIZE, 2.0 * GRID_SIZE);
 const LINE_COLOR: Color             = Color::srgb(0.8, 0.5, 0.2);
+const GRID_COLOR: Color             = Color::srgba(1.0, 1.0, 1.0, 0.02);
+const GRID_SIZE: f32                = 30.0;
 const MIN_X: f32    = -500.0;
 const MIN_Y: f32    = -500.0;
 const MAX_X: f32    = 500.0;
@@ -32,7 +34,10 @@ impl Plugin for GraphPlugin {
         app.init_resource::<GuiAssets>();
         app.init_resource::<TaskMapping>();
         app.add_observer(spawn_graph);
-        app.add_systems(Update, (draw_arrows_between_nodes, sync_task_xy));
+        app.add_systems(Update, (
+            sync_task_xy,
+            (draw_arrows_between_nodes, draw_grid), 
+        ));
     }
 }
 
@@ -115,7 +120,8 @@ fn spawn_graph(
             Transform::from_translation(Vec3::new(0.0, 0.0, 0.0001)),
             gui_assets.task_font.clone(),
         ))
-        .observe(handle_dragging)
+        .observe(translate_on_drag)
+        .observe(round_on_drag_end)
         .observe(pointer_on_over)
         .observe(default_on_out)
         .id();
@@ -162,16 +168,51 @@ fn draw_arrows_between_nodes(
     }
 }
 
-fn handle_dragging(
+fn draw_grid(
+    camera: Single<(&Transform, &OrthographicProjection), With<MainCamera>>,
+    mut draw: Gizmos,
+) {
+    let (cam_transf, cam_proj) = camera.into_inner();
+    let cam_bottom_left = cam_proj.area.min + cam_transf.translation.xy();
+    let cam_top_right = cam_proj.area.max + cam_transf.translation.xy();
+    let start = (cam_bottom_left / GRID_SIZE).floor().as_ivec2();
+    let end = (cam_top_right / GRID_SIZE).ceil().as_ivec2();
+    for x in start.x..end.x {
+        let start = IVec2::new(x, start.y).as_vec2() * GRID_SIZE;
+        let end = IVec2::new(x, end.y).as_vec2() * GRID_SIZE;
+        draw.line_2d(start, end, GRID_COLOR);
+    }
+    for y in start.y..end.y {
+        let start = IVec2::new(start.x, y).as_vec2() * GRID_SIZE;
+        let end = IVec2::new(end.x, y).as_vec2() * GRID_SIZE;
+        draw.line_2d(start, end, GRID_COLOR);
+    }
+}
+
+fn translate_on_drag(
     trigger: Trigger<Pointer<Drag>>,
+    camera_q: Query<&OrthographicProjection, With<MainCamera>>,
+    mut transf_q: Query<&mut Transform, Without<MainCamera>>,
+) {
+    let Ok(cam_proj) = camera_q.get_single() else { return };
+    let (entity, event) = (trigger.entity(), trigger.event());
+    if event.button != PointerButton::Primary { return };
+    let mut transf = transf_q.get_mut(entity).unwrap();
+    transf.translation.x += event.delta.x * cam_proj.scale;
+    transf.translation.y -= event.delta.y * cam_proj.scale;
+}
+
+fn round_on_drag_end(
+    trigger: Trigger<Pointer<DragEnd>>,
     mut transf_q: Query<&mut Transform>,
-    zoom: Res<Zoom>,
 ) {
     let (entity, event) = (trigger.entity(), trigger.event());
     if event.button != PointerButton::Primary { return };
     let mut transf = transf_q.get_mut(entity).unwrap();
-    transf.translation.x += event.delta.x * zoom.scale(); 
-    transf.translation.y -= event.delta.y * zoom.scale(); 
+    let top_left = transf.translation.xy() - TASK_NODE_SIZE / 2.0;
+    let top_left_rounded = (top_left / GRID_SIZE).round() * GRID_SIZE;
+    let new_translation = top_left_rounded + TASK_NODE_SIZE / 2.0;
+    transf.translation = new_translation.extend(0.0);
 }
 
 fn sync_task_xy(
