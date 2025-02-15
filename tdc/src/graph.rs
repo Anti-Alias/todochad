@@ -2,7 +2,7 @@ use slab::Slab;
 use thiserror::*;
 use serde::{Serialize, Deserialize};
 use ron::ser::PrettyConfig;
-use std::{fs, fmt};
+use std::{collections::HashSet, fmt, fs};
 use crate::Config;
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
@@ -66,6 +66,22 @@ impl Graph {
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (TaskId, &mut Task)> {
         self.tasks.iter_mut()
+    }
+
+    pub fn iter_with_tags<'a>(&'a self, tags: &'a [String]) -> impl Iterator<Item = (TaskId, &'a Task)> {
+        self.tasks
+            .iter()
+            .filter(move |(_task_id, task)| task.has_all_tags(tags))
+    }
+
+    pub fn tags(&self) -> HashSet<&str> {
+        let mut result = HashSet::new();
+        for (_, task) in &self.tasks {
+            for tag in &task.tags {
+                result.insert(tag.as_str());
+            }
+        }
+        result
     }
 
     pub fn len(&self) -> usize {
@@ -152,7 +168,6 @@ impl Graph {
         }
     }
 
-
     pub fn load(config: &Config) -> Result<Graph> {
         if fs::exists(&config.graph_path)? {
             let graph_string = std::fs::read_to_string(&config.graph_path)?;
@@ -181,6 +196,8 @@ pub struct Task {
     pub order: TaskOrder,
     #[serde(default)]
     pub xy: Option<(f32, f32)>,
+    #[serde(default)]
+    tags: Vec<String>,
     dependencies: Vec<TaskId>,
 }
 
@@ -192,8 +209,44 @@ impl Task {
             selected: false,
             order: TaskOrder::default(),
             xy: None,
+            tags: vec![],
             dependencies: vec![],
         }
+    }
+
+    pub fn tags(&self) -> &[String] {
+        &self.tags
+    }
+
+    /// Adds a tag, or ignores it if it's a case-insensitive duplicate.
+    /// Returns true if tag was succesfully added.
+    pub fn add_tag(&mut self, tag: String) -> bool {
+        if self.tags.iter().any(|existing_tag| existing_tag.eq_ignore_ascii_case(&tag)) {
+            return false;
+        }
+        self.tags.push(tag);
+        true
+    }
+
+    pub fn has_all_tags<'a>(&self, tags: impl IntoIterator<Item=&'a String>) -> bool {
+        for tag in tags.into_iter() {
+            let has_tag = self.tags.iter().any(|t| t.eq_ignore_ascii_case(tag));
+            if !has_tag { 
+                return false
+            }
+        }
+        true 
+    }
+
+    /// Removes a case-insensitive tag, or does nothing if no such tag was found.
+    pub fn remove_tag(&mut self, tag: &str) -> bool {
+        for (i, existing_tag) in &mut self.tags.iter().enumerate() {
+            if existing_tag.eq_ignore_ascii_case(tag) {
+                self.tags.remove(i);
+                return true;
+            }
+        }
+        false 
     }
 
     pub fn dependencies(&self) -> &[TaskId] {

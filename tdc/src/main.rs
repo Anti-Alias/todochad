@@ -7,7 +7,6 @@ use glob::{Pattern, PatternError};
 
 const INDENT: &str = "    ";
 
-
 #[derive(Parser, Debug)]
 #[command(name="tdc")]
 #[command(version="0.1")]
@@ -97,6 +96,24 @@ enum Command {
         #[clap(help="Id of task being ordered")]
         task_id: TaskId,
         order: Option<i32>,
+    },
+    #[command(name="tags", about="Lists all tags across all tasks.")]
+    Tags,    
+    #[command(name="tagadd", about="Add searchable tags to a task.")]
+    TagAdd {
+        #[clap(help="Task to add tags to")]
+        task_id: TaskId,
+        tags: Vec<String>,
+    },
+    #[command(name="tagrm", about="Removes tags from a task.")]
+    TagRemove {
+        #[clap(help="Task to add a tag to")]
+        task_id: TaskId,
+        tags: Vec<String>,
+    },
+    #[command(name="tagfind", about="Finds a task that has all of the tags specified.")]
+    TagFind {
+        tags: Vec<String>,
     },
 }
 
@@ -267,6 +284,46 @@ fn run_command(command: Command) -> Result<()> {
             task.order = order;
             graph.save(&config)?;
         },
+        Command::Tags => {
+            let graph = Graph::load(&config)?;
+            for task in graph.tags() {
+                println!("{task}");
+            }
+        },
+        Command::TagAdd { task_id, tags } => {
+            let mut graph = Graph::load(&config)?;
+            let mut modified = false;
+            let task = graph.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
+            for tag in tags {
+                if task.add_tag(tag) {
+                    modified = true;
+                }
+            }
+            if modified {
+                graph.save(&config)?;
+            }
+        },
+        Command::TagRemove { task_id, tags } => {
+            let mut graph = Graph::load(&config)?;
+            let mut modified = false;
+            let task = graph.get_mut(task_id).ok_or(GraphError::TaskNotFound)?;
+            for tag in tags {
+                if task.remove_tag(&tag) {
+                    modified = true;
+                }
+            }
+            if modified {
+                graph.save(&config)?;
+            }
+        },
+        Command::TagFind { tags } => {
+            let graph = Graph::load(&config)?;
+            let task_rows: Vec<TaskRow> = graph.iter_with_tags(&tags)
+                .map(|(task_id, task)| TaskRow::new(task_id, task))
+                .collect();
+            let task_table = Table::new(task_rows);
+            println!("{task_table}");
+        },
     }
     Ok(())
 }
@@ -276,10 +333,9 @@ struct TaskTree<'a> {
     task: &'a Task,
     graph: &'a Graph,
 }
-
 impl fmt::Display for TaskTree<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        print_task_tree(self.task_id, &self.task, &self.graph, 0, f)
+        print_task_tree(self.task_id, self.task, self.graph, 0, f)
     }
 }
 
@@ -307,6 +363,7 @@ fn print_task_tree(
 struct TaskRow<'a> {
     id: TaskId,
     name: &'a str,
+    tags: Tags<'a>,
     selected: bool,
     order: TaskOrder,
     dependencies: Dependencies<'a>, 
@@ -317,6 +374,7 @@ impl<'a> TaskRow<'a> {
         Self {
             id, 
             name: &task.name, 
+            tags: Tags(task.tags()),
             selected: task.selected,
             order: task.order, 
             dependencies: Dependencies(task.dependencies()),
@@ -332,6 +390,7 @@ struct Dependencies<'a>(&'a [TaskId]);
 impl fmt::Display for Dependencies<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.0.len() {
+            0 => {},
             1 => write!(f, "{}", self.0[0])?,
             2.. => {
                 write!(f, "{}", self.0[0])?;
@@ -339,7 +398,24 @@ impl fmt::Display for Dependencies<'_> {
                     write!(f, ",{task_id}")?;
                 }
             },
-            _ => {},
+        }
+        Ok(())
+    }
+}
+
+/// Printable list of a task's dependencies
+struct Tags<'a>(&'a [String]);
+impl fmt::Display for Tags<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.0.len() {
+            0 => {},
+            1 => write!(f, "{}", self.0[0])?,
+            2.. => {
+                write!(f, "{}", self.0[0])?;
+                for tag in &self.0[1..] {
+                    write!(f, ",{tag}")?;
+                }
+            },
         }
         Ok(())
     }
